@@ -5,21 +5,25 @@
     <string name="close">X</string>
     <string name="field_prompt">prompt:</string>
     <string name="default_prompt">HQ photo of snowy mountains, blue sky</string>
-    <string name="field_negative">neg:</string>
+    <string name="field_negative">negative prompt:</string>
     <string name="default_negative">blurry</string>
     <string name="field_steps">steps:</string>
     <string name="default_steps">18</string>
     <string name="field_seed">seed:</string>
     <string name="default_minus1">-1</string>
-    <string name="field_modelfile">model</string>
-    <string name="field_embedd">"embd</string>
+    <string name="field_modelfile">model:</string>
+    <string name="field_embedd">embeddings</string>
     <string name="field_cpu">"CPU</string>
     <string name="field_taesd">"use taesd</string>
     <string name="field_taesdXL">use taesdXL</string>
-    <string name="field_lorapath">lora path</string>
+    <string name="field_lorapath">lora path:</string>
     <string name="field_widthXheight">WxH:</string>
     <string name="default_height">512</string>
     <string name="default_width">512</string>
     <string name="field_cfgs">cfg:</string>
     <string name="default_cfg">7</string>
+    <string name="sampler">sampler:</string>
+    <string name="scheduler">scheduler:</string>
+    <string name="field_options">additional options:</string>
+    <string name="options" translatable="false">--params-backend disk --fa</string>
 </resources>
