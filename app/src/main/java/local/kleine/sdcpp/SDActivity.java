@@ -3,17 +3,25 @@ package local.kleine.sdcpp;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -31,6 +39,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -41,11 +50,19 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-
 public class SDActivity extends AppCompatActivity {
+
+    public static final int EXIT_CODE_CANCELLED   = 997;
+    public static final int EXIT_CODE_CAN_NOT_RUN = 998;
+    public static final int EXIT_CODE_EXCEPTION   = 999;
+
+    private static volatile String outputImagePath = "";
+    private static volatile ArrayList<String> outputArrayList;
+    private static sdIOThread sd_thread = null;
+
+    public  String exceptionDescription = "";
     private Activity myActivity;
-    private Process process;
-    private String sdProgramPath, outputImagePath, selectedModelfile, selectedSampler, taesdModel, taesdXLModel, helperPath,
+    private String sdProgramPath, selectedModelfile, selectedSampler, selectedScheduler, taesdModel, taesdXLModel, helperPath,
             libPath, sdFileName; // Note: "sd" or "sd_cli" executable needs renaming because it is now located inside jniLibs
 
     private final static String SDlibopenCL = "libsdopenCL.so";
@@ -54,24 +71,68 @@ public class SDActivity extends AppCompatActivity {
             getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS).
             getAbsolutePath();
     private EditText promptEditor, negativeEditor, seedEditor, stepsEditor,
-            widthEditor, heightEditor, cfgscaleEditor;
+            widthEditor, heightEditor, cfgscaleEditor, optionsEditor;
     private CheckBox taesdchecker, taesdXLchecker, embeddchecker, cpuchecker;
     private ListView sdLogView;
+    private View coverView;
+    private Button closeButton;
     private ImageView imageOutputView;
-    private ArrayList<String> outputArrayList;
     private ArrayAdapter<String> arrayAdapter;
     private boolean lastProgressBar = true;               // helper for message log
-    private final String[] samplerArr = {"euler", "euler_a", "heun", "dpm2", "dpm++2s_a", "dpm++2m",
-            "dpm++2mv2", "ipndm", "ipndm_v", "lcm" /* LCM_POS 9 */, "ddim_trailing", "tcd"};
+    private final String[] samplerArr = {
+            "euler",
+            "euler_a",
+            "heun",
+            "dpm2",
+            "dpm++2s_a",
+            "dpm++2m",
+            "dpm++2mv2",
+            "ipndm",
+            "ipndm_v",
+            "lcm" /* LCM_POS 9 */,
+            "ddim_trailing",
+            "tcd",
+            "res_multistep",
+            "res_2s",
+            "er_sde",
+            "euler_cfg_pp",
+            "euler_a_cfg_pp",
+            "euler_ge",
+            "dpm++2m_sde",
+            "dpm++2m_sde_bt",
+            "lms",
+    };
     private static final int LCM_POS = 9;
-    private List<String> fileList, samplerList;
+
+    private final String[] schedulerArr = {
+            "discrete",
+            "karras",
+            "exponential",
+            "ays",
+            "gits",
+            "sgm_uniform",
+            "simple",
+            "smoothstep",
+            "kl_optimal",
+            "lcm",
+            "bong_tangent",
+            "ltx2",
+            "logit_normal",
+            "flux2",
+            "flux",
+            "beta",
+            "llada_image",
+    };
+
+    private List<String> fileList, samplerList, schedulerList;
     private static String lastMsg = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         myActivity = this;
-        if (!Environment.isExternalStorageManager()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                !Environment.isExternalStorageManager()) {
             setContentView(R.layout.activity_permissions);
             Button requestPermissionButton = findViewById(R.id.requestPermissionButton);
             requestPermissionButton.setOnClickListener(v -> {
@@ -93,13 +154,79 @@ public class SDActivity extends AppCompatActivity {
     final ActivityResultLauncher<Intent> activityResultLaunch = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
-                if (Environment.isExternalStorageManager()) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
+                        Environment.isExternalStorageManager()) {
                     runSDcpp();
                 }
             });
 
+
+    View.OnClickListener cancelGenerationListener = new View.OnClickListener()
+    {
+        @Override
+        public void onClick(View v) {
+            Window viewWindow = myActivity.getWindow();
+            View coverView = myActivity.findViewById(R.id.coverView);
+            coverView.setOnTouchListener(null);
+            coverView.setVisibility(View.GONE);
+            WindowManager.LayoutParams lp = viewWindow.getAttributes();
+            lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+            viewWindow.setAttributes(lp);
+
+            sd_thread.processDestroy();
+            sd_thread = null;
+
+            outputArrayList.clear();
+            outputArrayList = null;
+            outputImagePath = "";
+
+            Intent intent = new Intent(SDActivity.this, MainActivity.class);
+            intent.putExtra("result", "ready");
+            setResult(RESULT_OK, intent);
+            finish();
+        }
+    };
+
+    private void setupWindow() {
+        // setup, common for settings and log/result views
+        // needs initialized outputArrayList
+        OnBackPressedCallback callback = new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                setResult(RESULT_OK);  // sdcpp found
+                finish();
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, callback);
+
+        androidx.appcompat.app.ActionBar ab = getSupportActionBar();
+        if (ab != null) {
+            ab.hide();                                                      // request all visible space available
+        }
+
+        // not needed, rotations are handled
+        //setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED); // needed for sd log output
+
+        setContentView(R.layout.activity_main);
+        sdLogView = findViewById(R.id.sdLogView);
+        arrayAdapter = new ArrayAdapter<>(this, R.layout.custom_list_item, R.id.output_item_line, outputArrayList);
+        sdLogView.setAdapter(arrayAdapter);
+        imageOutputView = findViewById(R.id.outputImageView);
+        coverView = findViewById(R.id.coverView);
+        closeButton = findViewById(R.id.closeButton);
+    }
+
     @SuppressLint("SetTextI18n")
     public void runSDcpp() {
+        if (sd_thread != null) {
+            // SD.cpp is launched, connecting to its console
+            setupWindow();
+            findViewById(R.id.wrapperView).setVisibility(View.GONE);
+            lockScreenDim();
+            findViewById(R.id.closeButton).setOnClickListener(cancelGenerationListener);
+            sd_thread.updateActivity((SDActivity) myActivity);
+            return;
+        }
         boolean canUseOpenCL = false;
         final File nativeLibDir = new File(getApplicationInfo().nativeLibraryDir);
         final String[] libs = nativeLibDir.list();
@@ -111,28 +238,13 @@ public class SDActivity extends AppCompatActivity {
                 }
             }
         }
-        OnBackPressedCallback callback = new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                setResult(RESULT_OK);
-                finish();
-            }
-        };
-        getOnBackPressedDispatcher().addCallback(this, callback);
-        androidx.appcompat.app.ActionBar ab = getSupportActionBar();
-        if (ab != null) {
-            ab.hide();                                                      // request all visible space available
-        }
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE); // needed for sd log output
-        setContentView(R.layout.activity_main);
-        sdLogView = findViewById(R.id.sdLogView);
-        outputArrayList = new ArrayList<>();
-        arrayAdapter = new ArrayAdapter<>(this, R.layout.custom_list_item, R.id.output_item_line, outputArrayList);
-        sdLogView.setAdapter(arrayAdapter);
-        imageOutputView = findViewById(R.id.outputImageView);
+
+        outputArrayList = new ArrayList<>();  // initialize log
+        setupWindow();
         promptEditor = findViewById(R.id.stringprompt);
         promptEditor.addTextChangedListener(createTextWatcher());
         negativeEditor = findViewById(R.id.stringnegprompt);
+        optionsEditor = findViewById(R.id.stringopt);
         stepsEditor = findViewById(R.id.stringsteps);
         seedEditor = findViewById(R.id.stringseed);
         widthEditor = findViewById(R.id.stringwidth);
@@ -140,24 +252,32 @@ public class SDActivity extends AppCompatActivity {
         seedEditor = findViewById(R.id.stringseed);
         cfgscaleEditor = findViewById(R.id.stringcfgscale);
         Button submitButton = findViewById(R.id.submitButton);
+
         fileList = listExternalFiles(sdWorkPath);
         if (fileList.isEmpty()) {
             submitButton.setEnabled(false);
             fileList.add("At first copy SD model file to this device.");
         }
         Collections.sort(fileList);
-        Spinner spinner1 = findViewById(R.id.spinner1);
-        spinner1.setOnItemSelectedListener(new ItemSelectedListener());
-        ArrayAdapter<String> adapter1 = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, fileList);
-        adapter1.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner1.setAdapter(adapter1);
+        Spinner model_spinner = findViewById(R.id.model_spinner);
+        model_spinner.setOnItemSelectedListener(new ItemSelectedListener());
+        ArrayAdapter<String> model_adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, fileList);
+        model_adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        model_spinner.setAdapter(model_adapter);
 
-        Spinner spinner2 = findViewById(R.id.spinner2);
-        spinner2.setOnItemSelectedListener(new ItemSelectedListener());
+        Spinner sampler_spinner = findViewById(R.id.sampler_spinner);
+        sampler_spinner.setOnItemSelectedListener(new ItemSelectedListener());
         samplerList = Arrays.asList(samplerArr);
-        ArrayAdapter<String> adapter2 = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, samplerList);
-        adapter2.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner2.setAdapter(adapter2);
+        ArrayAdapter<String> sampler_adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, samplerList);
+        sampler_adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        sampler_spinner.setAdapter(sampler_adapter);
+
+        Spinner scheduler_spinner = findViewById(R.id.scheduler_spinner);
+        scheduler_spinner.setOnItemSelectedListener(new ItemSelectedListener());
+        schedulerList = Arrays.asList(schedulerArr);
+        ArrayAdapter<String> scheduler_adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, schedulerList);
+        scheduler_adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        scheduler_spinner.setAdapter(scheduler_adapter);
 
         TextView taesdview = findViewById(R.id.taesdmodel);
         if (!taesdModel.isEmpty()) {
@@ -180,16 +300,15 @@ public class SDActivity extends AppCompatActivity {
         cpuchecker.setEnabled(canUseOpenCL);
         TextView loraPathView = findViewById(R.id.lorapath);
         loraPathView.setText(helperPath);
-        submitButton.setOnClickListener(v ->
-        {
-            View wrapperLinearLayout = findViewById(R.id.wrapperLinearLayout);
-            wrapperLinearLayout.setVisibility(View.GONE);
+        submitButton.setOnClickListener(v -> {
+            View wrapperView = findViewById(R.id.wrapperView);
+            wrapperView.setVisibility(View.GONE);
             String prompt = promptEditor.getText().toString();
             if (prompt.isEmpty()) {
                 prompt = "something";
             }
             String negative = negativeEditor.getText().toString();
-            outputImagePath = sdWorkPath + "/output" + System.currentTimeMillis() / 1000L;
+            outputImagePath = sdWorkPath + "/output" + (System.currentTimeMillis() / 1000L) + ".jpg";
             String taesdoption = "";
             if (taesdchecker.isChecked()) {
                 taesdoption = taesdModel;
@@ -197,65 +316,60 @@ public class SDActivity extends AppCompatActivity {
             if (taesdXLchecker.isChecked()) {
                 taesdoption = taesdXLModel;
             }
-            String[] arguments = new String[]{"",
-                    "-m", selectedModelfile,
-                    "-p", prompt,
-                    "-n", negative,
-                    "-o", outputImagePath,
-                    "--lora-model-dir", helperPath,
-                    "--embd-dir", embeddchecker.isChecked() ? helperPath : "",
-                    "--sampling-method", selectedSampler,
-                    "--taesd", taesdoption,
-                    "--cfg-scale", check(cfgscaleEditor.getText().toString(), "7.0"),
-                    "--seed", check(seedEditor.getText().toString(), "-1"),
-                    "--steps", checkSteps(stepsEditor.getText().toString(), "25"),
-                    "--width", checkDimension(widthEditor.getText().toString(), "512"),
-                    "--height", checkDimension(heightEditor.getText().toString(), "512"),
-                    "-v",
-                    "--mmap",
-                    "--mmap",
-                    "--mmap",
-                    "--mmap",
-                    "--mmap",
-                    "--mmap",
-                    "--mmap" // some options are place holders only
-            };
-            int n = arguments.length;
+/* 0 */     ArrayList<String> arguments = new ArrayList<>(Arrays.asList("",
+/* 1 2 */           "-m", selectedModelfile,
+/* 3 4 */           "-p", prompt,
+/* 5 6 */           "-n", negative,
+/* 7 8 */           "-o", outputImagePath,
+/* 9 10 */          "--lora-model-dir", helperPath,
+/* 11 12 */         "--embd-dir", embeddchecker.isChecked() ? helperPath : "",
+/* 13 14 */         "--sampling-method", selectedSampler,
+/* 15 16 */         "--taesd", taesdoption,
+/* 17 18 */         "--cfg-scale", check(cfgscaleEditor.getText().toString(), "7.0"),
+/* 19 20 */         "--seed", check(seedEditor.getText().toString(), "-1"),
+/* 21 22 */         "--steps", checkSteps(stepsEditor.getText().toString(), "25"),
+/* 23 24 */         "--width", checkDimension(widthEditor.getText().toString(), "512"),
+/* 25 26 */         "--height", checkDimension(heightEditor.getText().toString(), "512"),
+/* 27 28 */         "--scheduler", selectedScheduler,
+/* 29 */            "-v"
+                    // "--mmap"  // --params-backend seems to work better
+            ));
+            libPath = nativeLibDir.toString();
+            String libVendorPath = "/vendor/lib64";
             if (cpuchecker.isChecked()) {
                 sdFileName = SDlib;
-                libPath = "";
-                arguments[n - 4] = "--vae-tiling";  // currently not for openCL
+                arguments.add("--vae-tiling");  // currently not for openCL
                 // for some budget devices with low RAM and NO usable openCL drivers:
                 if (selectedModelfile.toUpperCase().contains("SSD")) {
-                    arguments[n - 2] = "--type";
-                    arguments[n - 1] = "q8_0";
+                    arguments.add("--type");
+                    arguments.add("q8_0");
                 } else {
                     if (selectedModelfile.toUpperCase().contains("XL")) {
                         if (!selectedModelfile.toUpperCase().contains("GGUF")) {
-                            arguments[n - 2] = "--type";
-                            arguments[n - 1] = "q8_0"; //"q4_0";
+                            arguments.add("--type");
+                            arguments.add("q8_0"); //"q4_0";
                         } // else keep as GGUF is
                     } else {
                         if (selectedModelfile.toUpperCase().contains("NITRO")) {
-                            arguments[n - 2] = "--type";
-                            arguments[n - 1] = "q4_0";
-                            arguments[n - 4] = "--scheduler";
-                            arguments[n - 3] = "sgm_uniform";
-                            arguments[n - 6] = "--timestep-shift";
-                            arguments[n - 5] = "250";
+                            arguments.add("--type");
+                            arguments.add("q4_0");
+                            arguments.add("--scheduler");
+                            arguments.add("sgm_uniform");
+                            arguments.add("--timestep-shift");
+                            arguments.add("250");
                         }
                     }
                 }
             } else {
                 sdFileName = SDlibopenCL;
-                libPath = "/vendor/lib64";
+                libPath += ":" + libVendorPath;
                 // this settings seem to work quite well at openCL/ADRENO 810
-                arguments[n - 4] = "--diffusion-conv-direct";
-                arguments[n - 3] = "--vae-conv-direct";
-                arguments[n - 2] = "--type";
-                arguments[n - 1] = "q4_0";  // "f16";    (optimal for huge VRAM)
-                arguments[n - 6] = "-t";    // for q4_0  (less VRAM)
-                arguments[n - 5] = "1";     // for q4_0  (less VRAM)
+                arguments.add("--diffusion-conv-direct");
+                arguments.add("--vae-conv-direct");
+                arguments.add("--type");
+                arguments.add("q4_0");  // "f16";    (optimal for huge VRAM)
+                arguments.add("-t");    // for q4_0  (less VRAM)
+                arguments.add("1");     // for q4_0  (less VRAM)
             }
             File file = new File(this.getApplicationInfo().nativeLibraryDir, sdFileName);
             if (!(file.exists() && file.length() > 0)) {
@@ -266,19 +380,25 @@ public class SDActivity extends AppCompatActivity {
                 finish();
             }
             sdProgramPath = file.getAbsolutePath();
-            arguments[0] = sdProgramPath;
+            arguments.set(0, sdProgramPath);
+
+            // arg1 "arg2"        "arg3 with spaces"
+            arguments.addAll(Arrays.asList(optionsEditor.getText().toString().split(
+                    "\\x20+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"
+            )));
 
             try {
                 BufferedWriter writer = new BufferedWriter(new FileWriter(outputImagePath + ".sh"));
-                String[] args = arguments.clone();
-                if (libPath.isEmpty())  {
-                    args[0] = "sd \\\n";
+                String[] args = {};
+                args = arguments.toArray(args).clone();
+                if (libPath.contains(libVendorPath)) {
+                    args[0]= "LD_LIBRARY_PATH=" + libVendorPath + " sd \\\n";
                 } else {
-                    args[0]= "LD_LIBRARY_PATH=/vendor/lib64 sd \\\n";
+                    args[0] = "sd \\\n";
                 }
-                args[4] = "\"" + args[4] + "\" \\\n";
-                args[6] = "\"" + args[6] + "\" \\\n";
-                args[8] = "output.png \\\n";
+                args[4] = "\"" + args[4] + "\" \\\n";  // prompt
+                args[6] = "\"" + args[6] + "\" \\\n";  // negative prompt
+                args[8] = "output.jpg \\\n";
                 if (args[10].isEmpty()) args[ 9]="";  // lora-model-dir
                 if (args[12].isEmpty()) args[11]="";  // emb-dir
                 if (args[16].isEmpty()) args[15]="";  // taesd path
@@ -288,17 +408,26 @@ public class SDActivity extends AppCompatActivity {
             } catch (IOException e) {
                 Toast.makeText(myActivity, "Error writing cmdfile", Toast.LENGTH_SHORT).show();
             }
+            if (sd_thread == null) {
+                sd_thread = new sdIOThread((SDActivity) myActivity, arguments, sdWorkPath, libPath);
+                sd_thread.start();
+            } else {
+                sd_thread.updateActivity((SDActivity) myActivity);
+            }
+        });
 
-            new sdIOThread((SDActivity) myActivity, arguments, sdWorkPath, libPath).start();
+        TextView spm = findViewById(R.id.stringpromptmsg);
+        spm.setOnLongClickListener(v -> {
+            AppCompatDelegate.setDefaultNightMode(
+                    (AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES) ?
+                    AppCompatDelegate.MODE_NIGHT_NO :
+                            AppCompatDelegate.MODE_NIGHT_YES
+            );
+            return false;
         });
+
         Button closeButton = findViewById(R.id.closeButton);
-        closeButton.setOnClickListener(v -> {
-            sdIOThread.processDestroy();
-            Intent intent = new Intent(SDActivity.this, MainActivity.class);
-            intent.putExtra("result", "ready");
-            setResult(RESULT_OK, intent);
-            finish();
-        });
+        closeButton.setOnClickListener(cancelGenerationListener);
     }
 
     @NonNull
@@ -320,7 +449,7 @@ public class SDActivity extends AppCompatActivity {
 
     public void subFinished(int exitcode) {
         runOnUiThread(() -> {
-            File file = new File(outputImagePath + ".png");
+            File file = new File(outputImagePath);
             if (exitcode == 0 && file.exists()) {
                 imageOutputView.setVisibility(View.VISIBLE);
                 StringBuilder sb = new StringBuilder();
@@ -340,21 +469,122 @@ public class SDActivity extends AppCompatActivity {
                 String errMsg;
                 if (exitcode == 0 && !file.exists()) {
                     errMsg = "Result image not found";
-                } else {
-                    if (exitcode == 998) {
-                        errMsg = "can not run SD process";
-                    } else {
-                        if (exitcode == 999)
-                            errMsg = "Exception during SD execution";
-                        else
-                            errMsg = "SD process failed with code: " + exitcode;
-                    }
+                } else switch (exitcode) {
+                    case EXIT_CODE_CANCELLED:   errMsg = "cancelled"; break;
+                    case EXIT_CODE_CAN_NOT_RUN: errMsg = "can not run SD process"; break;
+                    case EXIT_CODE_EXCEPTION:   errMsg = "Exception during SD execution:\n" + exceptionDescription; break;
+                    default:  errMsg = "SD process failed with code: " + exitcode;
                 }
                 Toast.makeText(myActivity, errMsg, Toast.LENGTH_SHORT).show();
             }
         });
     }
 
+    private void hideDecor(Window w, boolean h) {
+        if (h) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {  // Android 9+ supports cutouts
+                WindowManager.LayoutParams lp = w.getAttributes();
+                lp.layoutInDisplayCutoutMode = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) ?  // Android 11+
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS :
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                w.setAttributes(lp);
+            }
+            if (false && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {  // Android 12+ because of BEHAVIOR_DEFAULT
+                w.setDecorFitsSystemWindows(false);
+                WindowInsetsController c = w.getInsetsController();
+                if (c != null) {
+                    c.hide(WindowInsets.Type.statusBars() |
+                            WindowInsets.Type.navigationBars());
+                    c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            } else {
+                View d = w.getDecorView();
+                d.setSystemUiVisibility(
+                        d.getSystemUiVisibility()
+                                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                );
+            }
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {  // Android 9+ supports cutouts
+                WindowManager.LayoutParams lp = w.getAttributes();
+                lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
+                w.setAttributes(lp);
+            }
+            if (false && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {  // Android 12+ because of BEHAVIOR_DEFAULT
+                w.setDecorFitsSystemWindows(true);
+                WindowInsetsController c = w.getInsetsController();
+                if (c != null) {
+                    c.show(WindowInsets.Type.statusBars() |
+                            WindowInsets.Type.navigationBars());
+                    c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_DEFAULT);
+                }
+            } else {
+                View d = w.getDecorView();
+                d.setSystemUiVisibility(
+                        d.getSystemUiVisibility() & ~(
+                                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        )
+                );
+            }
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    public void lockScreenDim() {
+        runOnUiThread(() -> {
+            Window viewWindow = getWindow();
+            viewWindow.setNavigationBarColor(Color.BLACK);
+            viewWindow.setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+            viewWindow.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            coverView.setAlpha(0.0f);
+            closeButton.setVisibility(View.VISIBLE);
+            WindowManager.LayoutParams lp = viewWindow.getAttributes();
+            lp.screenBrightness = 0.0f;
+            viewWindow.setAttributes(lp);
+
+            GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public boolean onSingleTapConfirmed(@NonNull MotionEvent e) {
+                    boolean v = closeButton.getVisibility() == View.VISIBLE;
+                    coverView.setAlpha(v ? 1.0f : 0.0f);
+                    closeButton.setVisibility(v ? View.GONE : View.VISIBLE);
+                    return true;
+                }
+                @Override
+                public boolean onDoubleTap(@NonNull MotionEvent e) {
+                    boolean v = closeButton.getVisibility() == View.VISIBLE;
+                    closeButton.setVisibility(v ? View.GONE : View.VISIBLE);
+                    hideDecor(viewWindow, v);
+                    return true;
+                }
+            });
+            coverView.setOnTouchListener((View v, MotionEvent e) -> {
+                gestureDetector.onTouchEvent(e);
+                return sdLogView.dispatchTouchEvent(e);
+            });
+            coverView.setVisibility(View.VISIBLE);
+        });
+    }
+
+    public void restoreScreenBrightness() {
+        runOnUiThread(() -> {
+            Window viewWindow = getWindow();
+            viewWindow.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            WindowManager.LayoutParams lp = viewWindow.getAttributes();
+            lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+            viewWindow.setAttributes(lp);
+        });
+    }
 
     public void debugMsg(final String msg) {
         runOnUiThread(() -> {
@@ -362,7 +592,7 @@ public class SDActivity extends AppCompatActivity {
             final String clearToEOL = "\u001B[K";
             String text = msg;
             if (lastProgressBar && !isProgressBar) {
-                outputArrayList.add("");                          // at log begin and at progress bar end
+                outputArrayList.add("");  // at log begin and at progress bar end
             }
             if (text.contains(clearToEOL)) {
                 text = text.replace(clearToEOL, "");
@@ -372,7 +602,7 @@ public class SDActivity extends AppCompatActivity {
                 outputArrayList.set(last, text);
                 lastProgressBar = isProgressBar;
                 if (!isProgressBar) {
-                    outputArrayList.add("");                          // new line if no progress bar
+                    outputArrayList.add("");  // new line if no progress bar
                 }
                 arrayAdapter.notifyDataSetChanged();
                 sdLogView.setSelection(last);
@@ -439,9 +669,10 @@ public class SDActivity extends AppCompatActivity {
                         listFilesRecursively(file, fileList);
                     } else {
                         String fileName = file.getName();
-                        if (fileName.contains(".ckpt") ||
-                                fileName.contains(".gguf") ||
-                                fileName.contains(".safetensors")) {
+                        if (fileName.endsWith(".ckpt") ||
+                                fileName.endsWith(".gguf") ||
+                                fileName.endsWith(".pth") ||
+                                fileName.endsWith(".safetensors")) {
                             if (fileName.contains("taesdxl")) {
                                 taesdXLModel = file.getAbsolutePath();
                             } else {
@@ -464,21 +695,14 @@ public class SDActivity extends AppCompatActivity {
         }
     }
 
-    @Override
+   /* @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (process != null) {
-            if (process.isAlive()) {
-                processInfo(null, "sd.cpp aborted");
-                process.destroy();
-            }
-        }
     }
+    //*/
 
-    void processInfo(Process pr, String info) {
-        if (pr != null) {
-            process = pr;
-        }
+    void processInfo(String info) {
+        Process process = sdIOThread.process;
         if (process != null) {
             Toast.makeText(myActivity, info + "\n" + process, Toast.LENGTH_SHORT).show();
         }
@@ -499,8 +723,8 @@ public class SDActivity extends AppCompatActivity {
                 if (editable.toString().contains("<lora:")) {
                     // here some lazy checks:
                     if (editable.toString().toUpperCase().contains("LCM") || editable.toString().toUpperCase().contains("VEGA")) {
-                        Spinner spinner2 = findViewById(R.id.spinner2);
-                        spinner2.setSelection(LCM_POS);
+                        Spinner sampler_spinner = findViewById(R.id.sampler_spinner);
+                        sampler_spinner.setSelection(LCM_POS);
                     }
                 }
             }
@@ -510,7 +734,7 @@ public class SDActivity extends AppCompatActivity {
     public class ItemSelectedListener implements AdapterView.OnItemSelectedListener {
         @Override
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-            if (parent.getId() == R.id.spinner1) {
+            if (parent.getId() == R.id.model_spinner) {
                 selectedModelfile = fileList.get(position);
                 // here follow some lazy checks for easy defaults:
                 if (selectedModelfile.toUpperCase().contains("SDXS")) {
@@ -532,11 +756,15 @@ public class SDActivity extends AppCompatActivity {
                     }
                 }
             } else {
-                selectedSampler = samplerList.get(position);
-                if (selectedSampler.contains("lcm")) {
-                    stepsEditor.setText("4");
-                    cfgscaleEditor.setText("1");
+                if (parent.getId() == R.id.sampler_spinner) {
+                    selectedSampler = samplerList.get(position);
+                    if (selectedSampler.contains("lcm")) {
+                        stepsEditor.setText("4");
+                        cfgscaleEditor.setText("1");
+                    }
                 }
+                if (parent.getId() == R.id.scheduler_spinner)
+                    selectedScheduler = schedulerList.get(position);
             }
         }
 
