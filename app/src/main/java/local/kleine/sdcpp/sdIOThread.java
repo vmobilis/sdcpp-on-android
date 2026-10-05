@@ -1,18 +1,19 @@
 package local.kleine.sdcpp;
 
 import android.app.Activity;
+import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.List;
 import java.util.Map;
 
 class sdIOThread extends Thread implements Runnable {
-    private static Process process;
-    private final SDActivity myActivity;
+    public static Process process = null;
+    private volatile SDActivity myActivity;
 
-    sdIOThread(SDActivity parent, String[] arguments, String sdWorkPath, String sdLibraryPath ) {
+    sdIOThread(SDActivity parent, List<String> arguments, String sdWorkPath, String sdLibraryPath ) {
         myActivity = parent;
         try {
             ProcessBuilder processBuilder = new ProcessBuilder(arguments);
@@ -23,37 +24,51 @@ class sdIOThread extends Thread implements Runnable {
             processBuilder.directory(new File(sdWorkPath));
             processBuilder.redirectErrorStream(true);
             process = processBuilder.start();
-            myActivity.processInfo(process, "sd.cpp started");
+            myActivity.processInfo("sd.cpp started");
         } catch (Exception e) {
-            myActivity.subFinished(998);
+            Toast.makeText(myActivity, e.toString(), Toast.LENGTH_SHORT).show();
+            myActivity.subFinished(SDActivity.EXIT_CODE_CAN_NOT_RUN);
             myActivity.setResult(Activity.RESULT_CANCELED);
             myActivity.finishAndRemoveTask();
         }
     }
 
-    protected static void processDestroy() {
+    public void updateActivity(SDActivity a) {
+        myActivity = a;
+    }
+
+    public void processDestroy() {
         if (process != null) {
-            process.destroy();                                      // avoid resource leaks
+            try {
+                process.destroy();
+            } catch (Exception ignored) {
+            } finally {
+                process = null;
+            }
         }
     }
 
     @Override
     public void run() {
-        try (InputStream inputStream = process.getInputStream();
-             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+        myActivity.lockScreenDim();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))){
             String line;
-            while ((line = reader.readLine()) != null) {
+            while (process != null && (line = reader.readLine()) != null) {
                 if (!line.isEmpty()) {
-                    final String outputLine = line;
-                    myActivity.runOnUiThread(() -> myActivity.debugMsg(outputLine));
+                    myActivity.debugMsg(line);
                 }
             }
-            int exitCode = process.waitFor();
-            myActivity.runOnUiThread(() -> myActivity.subFinished(exitCode));
+            int exitCode = (process == null) ? SDActivity.EXIT_CODE_CANCELLED : process.waitFor();
+            myActivity.subFinished(exitCode);
+        } catch (java.io.IOException e) {
+            myActivity.subFinished(SDActivity.EXIT_CODE_CANCELLED);
         } catch (Exception e) {
-            myActivity.runOnUiThread(() -> myActivity.subFinished(999));
+            SDActivity a = myActivity;  // instead of synchronized()
+            a.exceptionDescription = e.getMessage();
+            a.subFinished(SDActivity.EXIT_CODE_EXCEPTION);
         } finally {
             processDestroy();
+            myActivity.restoreScreenBrightness();
         }
     }
 }
