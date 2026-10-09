@@ -26,9 +26,9 @@ class sdIOThread extends Thread implements Runnable {
             process = processBuilder.start();
             myActivity.processInfo("sd.cpp started");
         } catch (Exception e) {
-            Toast.makeText(myActivity, e.toString(), Toast.LENGTH_SHORT).show();
+            myActivity.exceptionDescription = e.getMessage();
             myActivity.subFinished(SDActivity.EXIT_CODE_CAN_NOT_RUN);
-            myActivity.setResult(Activity.RESULT_CANCELED);
+            myActivity.setResult(Activity.RESULT_OK);  // do not restart, notification will be in subFinished()
             myActivity.finishAndRemoveTask();
         }
     }
@@ -59,10 +59,10 @@ class sdIOThread extends Thread implements Runnable {
                     myActivity.debugMsg(line);
                 }
             }
-            int exitCode = (process == null) ? SDActivity.EXIT_CODE_CANCELLED : process.waitFor();
+            int exitCode = (process == null) ? SDActivity.EXIT_CODE_CANCELED : process.waitFor();
             myActivity.subFinished(exitCode);
         } catch (java.io.IOException e) {
-            myActivity.subFinished(SDActivity.EXIT_CODE_CANCELLED);
+            myActivity.subFinished(SDActivity.EXIT_CODE_CANCELED);
         } catch (Exception e) {
             SDActivity a = myActivity;  // instead of synchronized()
             a.exceptionDescription = e.getMessage();
