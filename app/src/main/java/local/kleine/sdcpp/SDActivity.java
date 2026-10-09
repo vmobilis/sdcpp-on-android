@@ -449,10 +449,9 @@ public class SDActivity extends AppCompatActivity {
             }
             File file = new File(this.getApplicationInfo().nativeLibraryDir, sdFileName);
             if (!(file.exists() && file.length() > 0)) {
-                Toast.makeText(this, sdFileName + " not found,\nplease rebuild this app", Toast.LENGTH_LONG).show();
                 Intent intent = new Intent(SDActivity.this, MainActivity.class);
-                intent.putExtra("result", "ERROR");
-                setResult(RESULT_CANCELED, intent);
+                intent.putExtra("result", sdFileName);
+                setResult(EXIT_CODE_NOT_FOUND, intent);
                 finish();
             }
             sdProgramPath = file.getAbsolutePath();
