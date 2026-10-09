@@ -1,8 +1,10 @@
 package local.kleine.sdcpp;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -52,9 +54,15 @@ import java.util.List;
 
 public class SDActivity extends AppCompatActivity {
 
-    public static final int EXIT_CODE_CANCELLED   = 997;
-    public static final int EXIT_CODE_CAN_NOT_RUN = 998;
-    public static final int EXIT_CODE_EXCEPTION   = 999;
+    public static final int EXIT_CODE_CANCELED    = 997;
+    // notification in subFinished()
+    public static final int EXIT_CODE_CAN_NOT_RUN  = 998;
+    // notification in subFinished(), exit and remove task
+    public static final int EXIT_CODE_EXCEPTION    = 999;
+    // notification in subFinished(), do not exit
+    public static final int EXIT_CODE_NOT_FOUND    = 1000;
+    // notification in MainActivity, exit
+    public static final int EXIT_CODE_DO_RESTART   = 1001;
 
     private static volatile String outputImagePath = "";
     private static volatile ArrayList<String> outputArrayList;
@@ -131,35 +139,102 @@ public class SDActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         myActivity = this;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-                !Environment.isExternalStorageManager()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                && !Environment.isExternalStorageManager()) {
             setContentView(R.layout.activity_permissions);
             Button requestPermissionButton = findViewById(R.id.requestPermissionButton);
             requestPermissionButton.setOnClickListener(v -> {
                 try {
-                    Intent intent = new Intent();
-                    intent.setAction(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                    Uri uri = Uri.fromParts("package", this.getPackageName(), null);
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                    Uri uri = Uri.fromParts("package", getPackageName(), null);
                     intent.setData(uri);
-                    activityResultLaunch.launch(intent);
+                    activityResultLauncher.launch(intent);
                 } catch (Exception e) {
-                    Toast.makeText(this, "Error requesting permission" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Error requesting permission: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             });
+        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+                /* && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M  //*/// min sdk == 24
+                && !haveOldPermissions()) {
+            setContentView(R.layout.activity_permissions);
+            Button requestPermissionButton = findViewById(R.id.requestPermissionButton);
+            // shouldShowRequestPermissionRationale() logic:
+            // 1st launch     -> false
+            // agree          -> false
+            // 1st rejection ,-> true (user probably needs an explanation)
+            // 2nd+ rejection -> false
+            if (shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+                // the user rejected once, on 2nd reject the access will be
+                // disabled permanently, therefore redirecting to settings
+                requestPermissionButton.setText(R.string.application_settings);
+                requestPermissionButton.setOnClickListener(v -> {
+                    try {
+                        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                        Uri uri = Uri.fromParts("package", getPackageName(), null);
+                        intent.setData(uri);
+                        activityResultLauncher.launch(intent);
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Error opening settings" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } else {
+                // 1st launch, suggest to open permission request
+                requestPermissionButton.setText(R.string.request_write);
+                requestPermissionButton.setOnClickListener(v -> {
+                    try {
+                        permissionRequestLauncher.launch(new String[]{
+                                Manifest.permission.READ_EXTERNAL_STORAGE,
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        });
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Error requesting permissions" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
         } else {
             runSDcpp();
         }
     }
 
-    final ActivityResultLauncher<Intent> activityResultLaunch = registerForActivityResult(
+    final boolean haveNewPermissions() {
+        // true if Android 11+ and have full access permissions
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                && Environment.isExternalStorageManager();
+    }
+
+    final boolean haveOldPermissions() {
+        // true if Android 6...10 and have read + write permissions
+        return /* Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && //*/// min sdk == 24
+                Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+                        && PackageManager.PERMISSION_GRANTED == checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                        && PackageManager.PERMISSION_GRANTED == checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+    }
+
+    ActivityResultLauncher<Intent> activityResultLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
-                        Environment.isExternalStorageManager()) {
+                if (haveNewPermissions() || haveOldPermissions()) {
                     runSDcpp();
+                } else {
+                    setResult(EXIT_CODE_DO_RESTART);  // restart
+                    finish();
                 }
             });
 
+    final ActivityResultLauncher<String[]> permissionRequestLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            permissions -> {
+                // can be simplified to haveOldPermissions()
+                if (/*  Build.VERSION.SDK_INT < Build.VERSION_CODES.M || //*/
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ||
+                                (Boolean.TRUE.equals(permissions.get(Manifest.permission.READ_EXTERNAL_STORAGE)) &&
+                                        Boolean.TRUE.equals(permissions.get(Manifest.permission.WRITE_EXTERNAL_STORAGE)))) {
+                    runSDcpp();
+                } else {
+                    setResult(EXIT_CODE_DO_RESTART);  // restart
+                    finish();
+                }
+            });
 
     View.OnClickListener cancelGenerationListener = new View.OnClickListener()
     {
