@@ -257,7 +257,7 @@ public class SDActivity extends AppCompatActivity {
 
             Intent intent = new Intent(SDActivity.this, MainActivity.class);
             intent.putExtra("result", "ready");
-            setResult(RESULT_OK, intent);
+            setResult(RESULT_OK, intent);  // do not restart, notification will be in subFinished()
             finish();
         }
     };
@@ -545,8 +545,8 @@ public class SDActivity extends AppCompatActivity {
                 if (exitcode == 0 && !file.exists()) {
                     errMsg = "Result image not found";
                 } else switch (exitcode) {
-                    case EXIT_CODE_CANCELLED:   errMsg = "cancelled"; break;
-                    case EXIT_CODE_CAN_NOT_RUN: errMsg = "can not run SD process"; break;
+                    case EXIT_CODE_CANCELED:   errMsg = "cancelled"; break;
+                    case EXIT_CODE_CAN_NOT_RUN: errMsg = "could not run SD process:\n" + exceptionDescription; break;
                     case EXIT_CODE_EXCEPTION:   errMsg = "Exception during SD execution:\n" + exceptionDescription; break;
                     default:  errMsg = "SD process failed with code: " + exitcode;
                 }
