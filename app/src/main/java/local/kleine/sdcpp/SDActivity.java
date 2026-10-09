@@ -265,15 +265,16 @@ public class SDActivity extends AppCompatActivity {
     private void setupWindow() {
         // setup, common for settings and log/result views
         // needs initialized outputArrayList
+        /*
         OnBackPressedCallback callback = new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                setResult(RESULT_OK);  // sdcpp found
+                setResult(RESULT_OK);
                 finish();
             }
         };
         getOnBackPressedDispatcher().addCallback(this, callback);
-
+        //*/
         androidx.appcompat.app.ActionBar ab = getSupportActionBar();
         if (ab != null) {
             ab.hide();                                                      // request all visible space available
