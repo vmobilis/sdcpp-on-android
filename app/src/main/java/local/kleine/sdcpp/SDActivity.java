@@ -457,26 +457,39 @@ public class SDActivity extends AppCompatActivity {
             sdProgramPath = file.getAbsolutePath();
             arguments.set(0, sdProgramPath);
 
-            // arg1 "arg2"        "arg3 with spaces"
-            arguments.addAll(Arrays.asList(optionsEditor.getText().toString().split(
-                    "\\x20+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"
-            )));
+            final String anySpace = /* Build.VERSION.SDK_INT < Build.VERSION_CODES.N ?
+                    "[\\s\\t\\n\\r\\f\\xA0\\x0B\\x85\\u1680\\u180e\\u2000-\\u200a\\u202f\\u205f\\u3000\\u2028\\u2029]" :  //*/
+                    "[\\h\\v\\s]";
+            String[] args = optionsEditor.getText().toString()
+                    // trim*trim
+                    .replaceAll("(^" + anySpace + "+)|(" + anySpace + "+$)", "")
+                    // arg1 "arg2"  "arg3 with spaces"   ""
+                    .split(anySpace + "+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+            if (!args[0].isEmpty()) arguments.addAll(Arrays.asList(args));
 
             try {
                 BufferedWriter writer = new BufferedWriter(new FileWriter(outputImagePath + ".sh"));
-                String[] args = {};
-                args = arguments.toArray(args).clone();
+                args = arguments.toArray(args).clone();  // always expanded
                 if (libPath.contains(libVendorPath)) {
                     args[0]= "LD_LIBRARY_PATH=" + libVendorPath + " sd \\\n";
                 } else {
                     args[0] = "sd \\\n";
                 }
-                args[4] = "\"" + args[4] + "\" \\\n";  // prompt
-                args[6] = "\"" + args[6] + "\" \\\n";  // negative prompt
+                args[4] = "\"" + args[4]
+                        .replace("\\", "\\\\")
+                        .replace("\"", "\\\"")
+                        + "\" \\\n";  // prompt
+                args[6] = "\"" + args[6]
+                        .replace("\\", "\\\\")
+                        .replace("\"", "\\\"")
+                        + "\" \\\n";  // negative prompt
                 args[8] = "output.jpg \\\n";
-                if (args[10].isEmpty()) args[ 9]="";  // lora-model-dir
-                if (args[12].isEmpty()) args[11]="";  // emb-dir
-                if (args[16].isEmpty()) args[15]="";  // taesd path
+                args[10] = "\"" + args[10] + "\"";
+                //if (args[10].isEmpty()) args[ 9]="";  // lora-model-dir
+                args[12] = "\"" + args[12] + "\"";
+                //if (args[12].isEmpty()) args[11]="";  // emb-dir
+                args[16] = "\"" + args[16] + "\"";
+                //if (args[16].isEmpty()) args[15]="";  // taesd path
                 String cmdline = String.join(" ", args);
                 writer.write(cmdline);
                 writer.close();
