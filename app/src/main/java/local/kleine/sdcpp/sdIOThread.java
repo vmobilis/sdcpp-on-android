@@ -50,7 +50,8 @@ class sdIOThread extends Thread implements Runnable {
 
     @Override
     public void run() {
-        myActivity.lockScreenDim();
+        myActivity.addScreenDimmer();
+        myActivity.lockScreenOn();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))){
             String line;
             while (process != null && (line = reader.readLine()) != null) {
@@ -70,6 +71,8 @@ class sdIOThread extends Thread implements Runnable {
             processDestroy();
             myActivity.restoreScreenBrightness();
         }
+
+        // not finishing the activity to view results or error log
     }
 }
 
