@@ -577,7 +577,7 @@ public class SDActivity extends AppCompatActivity {
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
                 w.setAttributes(lp);
             }
-            if (false && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {  // Android 12+ because of BEHAVIOR_DEFAULT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {  // Android 12+ because of BEHAVIOR_DEFAULT
                 w.setDecorFitsSystemWindows(false);
                 WindowInsetsController c = w.getInsetsController();
                 if (c != null) {
@@ -603,7 +603,7 @@ public class SDActivity extends AppCompatActivity {
                 lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
                 w.setAttributes(lp);
             }
-            if (false && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {  // Android 12+ because of BEHAVIOR_DEFAULT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {  // Android 12+ because of BEHAVIOR_DEFAULT
                 w.setDecorFitsSystemWindows(true);
                 WindowInsetsController c = w.getInsetsController();
                 if (c != null) {
