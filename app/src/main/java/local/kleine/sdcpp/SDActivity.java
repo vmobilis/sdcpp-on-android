@@ -236,7 +236,7 @@ public class SDActivity extends AppCompatActivity {
                 }
             });
 
-    View.OnClickListener cancelGenerationListener = new View.OnClickListener()
+    final View.OnClickListener cancelGenerationListener = new View.OnClickListener()
     {
         @Override
         public void onClick(View v) {
@@ -297,7 +297,8 @@ public class SDActivity extends AppCompatActivity {
             // SD.cpp is launched, connecting to its console
             setupWindow();
             findViewById(R.id.wrapperView).setVisibility(View.GONE);
-            lockScreenDim();
+            addScreenDimmer();
+            if (sdIOThread.process != null) lockScreenOn();
             findViewById(R.id.closeButton).setOnClickListener(cancelGenerationListener);
             sd_thread.updateActivity((SDActivity) myActivity);
             return;
@@ -614,18 +615,24 @@ public class SDActivity extends AppCompatActivity {
         }
     }
 
+    public void lockScreenOn() {
+        runOnUiThread(() -> {
+            Window viewWindow = getWindow();
+            viewWindow.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            WindowManager.LayoutParams lp = viewWindow.getAttributes();
+            lp.screenBrightness = 0.0f;
+            viewWindow.setAttributes(lp);
+        });
+    }
+
     @SuppressLint("ClickableViewAccessibility")
-    public void lockScreenDim() {
+    public void addScreenDimmer() {
         runOnUiThread(() -> {
             Window viewWindow = getWindow();
             viewWindow.setNavigationBarColor(Color.BLACK);
             viewWindow.setBackgroundDrawable(new ColorDrawable(Color.BLACK));
-            viewWindow.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             coverView.setAlpha(0.0f);
             closeButton.setVisibility(View.VISIBLE);
-            WindowManager.LayoutParams lp = viewWindow.getAttributes();
-            lp.screenBrightness = 0.0f;
-            viewWindow.setAttributes(lp);
 
             GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
                 @Override
