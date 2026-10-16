@@ -1,7 +1,8 @@
-### _Before you read on, please note:_
+A fork of https://github.com/akleine/sdcpp-on-android,
+adapted to use binaries of https://github.com/leejet/stable-diffusion.cpp,
+built in https://github.com/termux/termux-app.
 
-_Starting September 2026, a silent update, nonconsensually pushed by Google, will block every Android app whose developer hasn't registered with Google, signed their contract, paid up, and handed over government ID. More details here:  [**KEEP ANDROID OPEN**](https://keepandroidopen.org/en/)_
-***
+---
 
 # This is the sdcpp-on-android project
 
