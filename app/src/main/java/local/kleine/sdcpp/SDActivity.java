@@ -694,19 +694,23 @@ public class SDActivity extends AppCompatActivity {
         runOnUiThread(() -> {
             int countA = logList.size();
             int countL = outputArrayList.size();
+            boolean doUpdate = false;
             if (countA != 0 && countL >= countA) {
                 int lastA = countA - 1;
                 String line = outputArrayList.get(lastA);
                 if (!line.equals(logList.get(lastA))) {
                     logList.set(lastA, line);
-                    arrayAdapter.notifyDataSetChanged();
+                    doUpdate = true;
                 }
             }
             if (countL > countA) {
                 logList.addAll(outputArrayList.subList(countA, countL));
-                arrayAdapter.notifyDataSetChanged();
+                doUpdate = true;
             }
-            sdLogView.setSelection(countL - 1);
+            if (doUpdate) {
+                arrayAdapter.notifyDataSetChanged();
+                sdLogView.setSelection(countL - 1);
+            }
         });
     }
 
