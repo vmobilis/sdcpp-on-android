@@ -256,7 +256,7 @@ public class SDActivity extends AppCompatActivity {
         }
     };
 
-    private void setupWindow() {
+    private void setupLogWindow() {
         // setup, common for settings and log/result views
         androidx.appcompat.app.ActionBar ab = getSupportActionBar();
         if (ab != null) {
@@ -281,11 +281,11 @@ public class SDActivity extends AppCompatActivity {
     public void runSDcpp() {
         if (sd_thread != null) {
             // SD.cpp is launched or was finished, displaying the log
-            setupWindow();
+            setupLogWindow();
             findViewById(R.id.wrapperView).setVisibility(View.GONE);
             addScreenDimmer();
             if (sd_thread != null && sd_thread.process != null) lockScreenOn();  // still running, prevent sleeping
-            findViewById(R.id.closeButton).setOnClickListener(cancelGenerationListener);
+            closeButton.setOnClickListener(cancelGenerationListener);
             sd_thread.updateActivity((SDActivity) myActivity);
             return;
         }
@@ -301,7 +301,7 @@ public class SDActivity extends AppCompatActivity {
             }
         }
 
-        setupWindow();
+        setupLogWindow();
         promptEditor = findViewById(R.id.stringprompt);
         promptEditor.addTextChangedListener(createTextWatcher());
         negativeEditor = findViewById(R.id.stringnegprompt);
@@ -486,6 +486,8 @@ public class SDActivity extends AppCompatActivity {
             }
             sd_thread = new sdIOThread((SDActivity) myActivity, arguments, sdWorkPath, libPath, localOutputImagePath);
             sd_thread.start();
+
+            closeButton.setOnClickListener(cancelGenerationListener);
         });
 
         TextView spm = findViewById(R.id.stringpromptmsg);
@@ -497,9 +499,6 @@ public class SDActivity extends AppCompatActivity {
             );
             return true;
         });
-
-        Button closeButton = findViewById(R.id.closeButton);
-        closeButton.setOnClickListener(cancelGenerationListener);
     }
 
     @NonNull
