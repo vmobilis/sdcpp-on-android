@@ -74,6 +74,7 @@ public class SDActivity extends AppCompatActivity {
     private ListView sdLogView;
     private View coverView;
     private Button closeButton;
+    private Spinner sampler_spinner;
     private ImageView imageOutputView;
     private ArrayAdapter<String> arrayAdapter;
     private static final String[] samplerArr = {
@@ -228,7 +229,6 @@ public class SDActivity extends AppCompatActivity {
     {
         @Override
         public void onClick(View v) {
-            View coverView = myActivity.findViewById(R.id.coverView);
             coverView.setOnTouchListener(null);
             coverView.setVisibility(View.GONE);
             restoreScreenBrightness();
@@ -336,7 +336,7 @@ public class SDActivity extends AppCompatActivity {
         model_adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         model_spinner.setAdapter(model_adapter);
 
-        Spinner sampler_spinner = findViewById(R.id.sampler_spinner);
+        sampler_spinner = findViewById(R.id.sampler_spinner);
         sampler_spinner.setOnItemSelectedListener(new ItemSelectedListener());
         samplerList = Arrays.asList(samplerArr);
         ArrayAdapter<String> sampler_adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, samplerList);
@@ -806,7 +806,6 @@ public class SDActivity extends AppCompatActivity {
                 if (editable.toString().contains("<lora:")) {
                     // here some lazy checks:
                     if (editable.toString().toUpperCase().contains("LCM") || editable.toString().toUpperCase().contains("VEGA")) {
-                        Spinner sampler_spinner = findViewById(R.id.sampler_spinner);
                         sampler_spinner.setSelection(LCM_POS);
                     }
                 }
