@@ -18,6 +18,7 @@ import android.os.Environment;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.DisplayMetrics;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -148,7 +149,7 @@ public class SDActivity extends AppCompatActivity {
             // shouldShowRequestPermissionRationale() logic:
             // 1st launch     -> false
             // agree          -> false
-            // 1st rejection ,-> true (user probably needs an explanation)
+            // 1st rejection  -> true (user probably needs an explanation)
             // 2nd+ rejection -> false
             if (shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 // the user rejected once, on 2nd reject the access will be
@@ -291,6 +292,11 @@ public class SDActivity extends AppCompatActivity {
             if (sd_thread != null && sd_thread.process != null) lockScreenOn();  // still running, prevent sleeping
             closeButton.setOnClickListener(cancelGenerationListener);
             sd_thread.updateActivity((SDActivity) myActivity);
+            File file = new File(sd_thread.outputImagePath);
+            if (file.exists()) {
+                imageOutputView.setVisibility(View.VISIBLE);
+                displayResultImageFile(file);
+            }
             return;
         }
         boolean canUseOpenCL = false;
@@ -514,10 +520,15 @@ public class SDActivity extends AppCompatActivity {
 
     private void displayResultImageFile(@NonNull File imgFile) {
         Bitmap myBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
-        int h = myBitmap.getHeight();
-        int b = myBitmap.getWidth();
-        if (h > b) {
-            myBitmap = rotateBitmap(myBitmap, 270);
+        int bh = myBitmap.getHeight();
+        int bw = myBitmap.getWidth();
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        int dh = dm.heightPixels;
+        int dw = dm.widthPixels;
+        boolean verticalImage = bh >= bw;
+        boolean verticalScreen = dh >= dw;
+        if (bh != bw && dh != dw && verticalImage != verticalScreen) {
+            myBitmap = rotateBitmap(myBitmap, verticalImage ? 270 : 90);
         }
         imageOutputView.setImageBitmap(myBitmap);
     }
