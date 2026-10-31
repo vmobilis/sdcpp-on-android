@@ -3,6 +3,7 @@ package local.kleine.sdcpp;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -24,6 +25,7 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -67,6 +69,7 @@ public class SDActivity extends AppCompatActivity {
     private EditText promptEditor, negativeEditor, seedEditor, stepsEditor,
             widthEditor, heightEditor, cfgscaleEditor, optionsEditor;
     private CheckBox taesdchecker, taesdXLchecker, embeddchecker, cpuchecker;
+    private View wrapperView;
     private ListView sdLogView;
     private View coverView;
     private Button closeButton;
@@ -275,6 +278,7 @@ public class SDActivity extends AppCompatActivity {
         imageOutputView = findViewById(R.id.outputImageView);
         coverView = findViewById(R.id.coverView);
         closeButton = findViewById(R.id.closeButton);
+        wrapperView = findViewById(R.id.wrapperView);
     }
 
     @SuppressLint("SetTextI18n")
@@ -282,7 +286,7 @@ public class SDActivity extends AppCompatActivity {
         if (sd_thread != null) {
             // SD.cpp is launched or was finished, displaying the log
             setupLogWindow();
-            findViewById(R.id.wrapperView).setVisibility(View.GONE);
+            wrapperView.setVisibility(View.GONE);
             addScreenDimmer();
             if (sd_thread != null && sd_thread.process != null) lockScreenOn();  // still running, prevent sleeping
             closeButton.setOnClickListener(cancelGenerationListener);
@@ -362,7 +366,6 @@ public class SDActivity extends AppCompatActivity {
         TextView loraPathView = findViewById(R.id.lorapath);
         loraPathView.setText(helperPath);
         submitButton.setOnClickListener(v -> {
-            View wrapperView = findViewById(R.id.wrapperView);
             wrapperView.setVisibility(View.GONE);
             String prompt = promptEditor.getText().toString();
             if (prompt.isEmpty()) {
@@ -487,6 +490,7 @@ public class SDActivity extends AppCompatActivity {
             sd_thread = new sdIOThread((SDActivity) myActivity, arguments, sdWorkPath, libPath, localOutputImagePath);
             sd_thread.start();
 
+            ((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(wrapperView.getWindowToken(), 0);
             closeButton.setOnClickListener(cancelGenerationListener);
         });
 
