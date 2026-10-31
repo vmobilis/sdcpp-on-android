@@ -102,7 +102,7 @@ public class SDActivity extends AppCompatActivity {
     };
     private static final int LCM_POS = 9;
 
-    private final String[] schedulerArr = {
+    private static final String[] schedulerArr = {
             "discrete",
             "karras",
             "exponential",
@@ -123,7 +123,6 @@ public class SDActivity extends AppCompatActivity {
     };
     private static final int SGM_POS = 5;
     private List<String> fileList, samplerList, schedulerList;
-    private static String lastMsg = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -270,7 +269,6 @@ public class SDActivity extends AppCompatActivity {
 
     private void setupWindow() {
         // setup, common for settings and log/result views
-        // needs initialized outputArrayList
         androidx.appcompat.app.ActionBar ab = getSupportActionBar();
         if (ab != null) {
             ab.hide();                                                      // request all visible space available
@@ -296,7 +294,7 @@ public class SDActivity extends AppCompatActivity {
             setupWindow();
             findViewById(R.id.wrapperView).setVisibility(View.GONE);
             addScreenDimmer();
-            if (sdIOThread.process != null) lockScreenOn();  // still running, prevent sleeping
+            if (sd_thread != null && sd_thread.process != null) lockScreenOn();  // still running, prevent sleeping
             findViewById(R.id.closeButton).setOnClickListener(cancelGenerationListener);
             sd_thread.updateActivity((SDActivity) myActivity);
             return;
@@ -313,7 +311,6 @@ public class SDActivity extends AppCompatActivity {
             }
         }
 
-        outputArrayList = new ArrayList<>();  // initialize log
         setupWindow();
         promptEditor = findViewById(R.id.stringprompt);
         promptEditor.addTextChangedListener(createTextWatcher());
@@ -382,7 +379,7 @@ public class SDActivity extends AppCompatActivity {
                 prompt = "something";
             }
             String negative = negativeEditor.getText().toString();
-            outputImagePath = sdWorkPath + "/output" + (System.currentTimeMillis() / 1000L) + ".jpg";
+            String localOutputImagePath = sdWorkPath + "/output" + (System.currentTimeMillis() / 1000L) + ".jpg";
             String taesdoption = "";
             if (taesdchecker.isChecked()) {
                 taesdoption = taesdModel;
@@ -464,7 +461,7 @@ public class SDActivity extends AppCompatActivity {
             if (!args[0].isEmpty()) arguments.addAll(Arrays.asList(args));
 
             try {
-                BufferedWriter writer = new BufferedWriter(new FileWriter(outputImagePath + ".sh"));
+                BufferedWriter writer = new BufferedWriter(new FileWriter(localOutputImagePath + ".sh"));
                 args = arguments.toArray(args).clone();  // always expanded
                 if (libPath.contains(libVendorPath)) {
                     args[0] = "LD_LIBRARY_PATH=" + libVendorPath + " sd \\\n";
@@ -495,7 +492,7 @@ public class SDActivity extends AppCompatActivity {
                 } catch (Exception ignored) {
                 }
             }
-            sd_thread = new sdIOThread((SDActivity) myActivity, arguments, sdWorkPath, libPath);
+            sd_thread = new sdIOThread((SDActivity) myActivity, arguments, sdWorkPath, libPath, localOutputImagePath);
             sd_thread.start();
         });
 
@@ -532,15 +529,15 @@ public class SDActivity extends AppCompatActivity {
 
     public void subFinished(int exitcode, final String msg) {
         runOnUiThread(() -> {
-            File file = new File(outputImagePath);
+            File file = new File(sd_thread.outputImagePath);
             if (exitcode == 0 && file.exists()) {
                 imageOutputView.setVisibility(View.VISIBLE);
                 StringBuilder sb = new StringBuilder();
-                for (String line : outputArrayList)
+                for (String line : sd_thread.outputArrayList)
                     sb.append(line).append("\n");
                 String alllog = sb.toString();
                 try {
-                    BufferedWriter writer = new BufferedWriter(new FileWriter(outputImagePath + ".log.txt"));
+                    BufferedWriter writer = new BufferedWriter(new FileWriter(sd_thread.outputImagePath + ".log.txt"));
                     writer.write(alllog);
                     writer.close();
                 } catch (IOException e) {

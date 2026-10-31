@@ -3,6 +3,7 @@ package local.kleine.sdcpp;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -13,8 +14,17 @@ class sdIOThread extends Thread implements Runnable {
     private volatile SDActivity myActivity;
     private boolean wasNotInterrupted = false;
 
-    sdIOThread(SDActivity parent, List<String> arguments, String sdWorkPath, String sdLibraryPath ) {
+    // helpers for message log
+    private String lastMsg = "";
+    private boolean lastProgressBar = false;
+
+    final public String outputImagePath;
+
+    final public ArrayList<String> outputArrayList = new ArrayList<>();
+
+    sdIOThread(SDActivity parent, List<String> arguments, String sdWorkPath, String sdLibraryPath, String outputImage ) {
         myActivity = parent;
+        outputImagePath = outputImage;
         try {
             ProcessBuilder processBuilder = new ProcessBuilder(arguments);
             if (!sdLibraryPath.isEmpty()) {
