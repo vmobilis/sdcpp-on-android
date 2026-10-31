@@ -43,6 +43,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.lifecycle.ViewModelProvider;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -56,6 +57,7 @@ public class SDActivity extends AppCompatActivity {
 
     public static final int EXIT_CODE_DO_RESTART   = 1001;
 
+    private SDViewModel vm = null;
     private ArrayList<String> logList = null;
     private static sdIOThread sd_thread = null;
     private Activity myActivity;
@@ -128,6 +130,7 @@ public class SDActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         myActivity = this;
+        vm = new ViewModelProvider(this).get(SDViewModel.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                 && !Environment.isExternalStorageManager()) {
             setContentView(R.layout.activity_permissions);
@@ -519,7 +522,11 @@ public class SDActivity extends AppCompatActivity {
     }
 
     private void displayResultImageFile(@NonNull File imgFile) {
-        Bitmap myBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
+        Bitmap myBitmap = vm.getBitmap();
+        if (myBitmap == null) {
+            myBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
+            vm.setBitmap(myBitmap);
+        }
         int bh = myBitmap.getHeight();
         int bw = myBitmap.getWidth();
         DisplayMetrics dm = getResources().getDisplayMetrics();
