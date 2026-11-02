@@ -38,6 +38,7 @@ import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -55,7 +56,7 @@ import java.util.List;
 
 public class SDActivity extends AppCompatActivity {
 
-    public static final int EXIT_CODE_DO_RESTART   = 1001;
+    public static final int EXIT_CODE_DO_RESTART = 1001;
 
     private SDViewModel vm = null;
     private ArrayList<String> logList = null;
@@ -221,7 +222,7 @@ public class SDActivity extends AppCompatActivity {
                 if (/*  Build.VERSION.SDK_INT < Build.VERSION_CODES.M || //*/
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ||
                                 (Boolean.TRUE.equals(permissions.get(Manifest.permission.READ_EXTERNAL_STORAGE)) &&
-                                 Boolean.TRUE.equals(permissions.get(Manifest.permission.WRITE_EXTERNAL_STORAGE)))) {
+                                        Boolean.TRUE.equals(permissions.get(Manifest.permission.WRITE_EXTERNAL_STORAGE)))) {
                     runSDcpp();
                 } else {
                     setResult(EXIT_CODE_DO_RESTART);
