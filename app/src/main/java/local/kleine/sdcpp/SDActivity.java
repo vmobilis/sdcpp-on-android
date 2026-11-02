@@ -44,7 +44,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.lifecycle.ViewModelProvider;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
