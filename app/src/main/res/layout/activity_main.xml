@@ -43,7 +43,7 @@
                     android:labelFor="@id/stringpromptmsg"
                     android:singleLine="false"
                     android:text="@string/default_prompt"
-                    android:drawableEnd="@android:drawable/ic_menu_close_clear_cancel"
+                    android:drawableEnd="@drawable/close_circle"
                     android:drawablePadding="10dp"
                     tools:ignore="Autofill,TouchTargetSizeCheck" />
             </LinearLayout>
@@ -70,7 +70,7 @@
                     android:labelFor="@id/stringnegpromptmsg"
                     android:singleLine="false"
                     android:text="@string/default_negative"
-                    android:drawableEnd="@android:drawable/ic_menu_close_clear_cancel"
+                    android:drawableEnd="@drawable/close_circle"
                     android:drawablePadding="10dp"
                     tools:ignore="autofill,TouchTargetSizeCheck" />
             </LinearLayout>
@@ -508,12 +508,75 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:inputType="text"
-                                android:labelFor="@id/stringpromptmsg"
+                                android:labelFor="@id/stringt5xxlmsg"
                                 android:singleLine="true"
                                 android:text=""
+                                android:textAlignment="viewEnd"
                                 android:drawablePadding="10dp"
-                                android:drawableTint="@color/teal_200"
-                                android:drawableEnd="@android:drawable/ic_menu_manage"
+                                android:drawableEnd="@drawable/folder_open"
+                                tools:ignore="Autofill,TouchTargetSizeCheck" />
+
+                            <TextView
+                                android:id="@+id/stringllmmsg"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:labelFor="@id/stringllm"
+                                android:text="@string/llm"
+                                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                            <EditText
+                                android:id="@+id/stringllm"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="text"
+                                android:labelFor="@id/stringllmmsg"
+                                android:singleLine="true"
+                                android:text=""
+                                android:textAlignment="viewEnd"
+                                android:drawablePadding="10dp"
+                                android:drawableEnd="@drawable/folder_open"
+                                tools:ignore="Autofill,TouchTargetSizeCheck" />
+
+                            <TextView
+                                android:id="@+id/stringclip_lmsg"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:labelFor="@id/stringclip_l"
+                                android:text="@string/clip_l"
+                                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                            <EditText
+                                android:id="@+id/stringclip_l"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="text"
+                                android:labelFor="@id/stringclip_lmsg"
+                                android:singleLine="true"
+                                android:text=""
+                                android:textAlignment="viewEnd"
+                                android:drawablePadding="10dp"
+                                android:drawableEnd="@drawable/folder_open"
+                                tools:ignore="Autofill,TouchTargetSizeCheck" />
+
+                            <TextView
+                                android:id="@+id/stringvaemsg"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:labelFor="@id/stringvae"
+                                android:text="@string/vae"
+                                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                            <EditText
+                                android:id="@+id/stringvae"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="text"
+                                android:labelFor="@id/stringvaemsg"
+                                android:singleLine="true"
+                                android:text=""
+                                android:textAlignment="viewEnd"
+                                android:drawablePadding="10dp"
+                                android:drawableEnd="@drawable/folder_open"
                                 tools:ignore="Autofill,TouchTargetSizeCheck" />
 
                             <TextView
@@ -533,7 +596,7 @@
                                 android:singleLine="false"
                                 android:text="--fa"
                                 android:drawablePadding="10dp"
-                                android:drawableEnd="@android:drawable/ic_menu_close_clear_cancel"
+                                android:drawableEnd="@drawable/close_circle"
                                 tools:ignore="Autofill,TouchTargetSizeCheck" />
                         </LinearLayout>
 

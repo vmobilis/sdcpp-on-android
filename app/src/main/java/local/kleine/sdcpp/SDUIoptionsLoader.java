@@ -42,6 +42,9 @@ public class SDUIoptionsLoader implements View.OnClickListener {
         optionsUIIdMap.put("--sampling-method", R.id.sampler_spinner);
         optionsUIIdMap.put("--scheduler", R.id.scheduler_spinner);
         optionsUIIdMap.put("--t5xxl", R.id.stringt5xxl);
+        optionsUIIdMap.put("--vae", R.id.stringvae);
+        optionsUIIdMap.put("--llm", R.id.stringllm);
+        optionsUIIdMap.put("--clip_l", R.id.stringclip_l);
         //-- pseudo options for setting UI elements --
         optionsUIIdMap.put("--use-taesd", R.id.taesdchecker);
         optionsUIIdMap.put("--no-taesd", R.id.taesdchecker); // "--no-" == inversed
@@ -86,24 +89,46 @@ public class SDUIoptionsLoader implements View.OnClickListener {
 
     private void parseShellScript(String input) {
         View v;
+        EditText t5xxlEditor = sda.findViewById(R.id.stringt5xxl);
+        EditText llmEditor = sda.findViewById(R.id.stringllm);
+        EditText vaeEditor = sda.findViewById(R.id.stringvae);
+        EditText clip_lEditor = sda.findViewById(R.id.stringclip_l);
+        t5xxlEditor.requestFocus();
+        t5xxlEditor.setText(""); // empty file selector driven fields
+        llmEditor.requestFocus();
+        llmEditor.setText("");
+        vaeEditor.requestFocus();
+        vaeEditor.setText("");
+        clip_lEditor.requestFocus();
+        clip_lEditor.setText("");
+        String workPathPattern = Pattern.quote(sda.sdWorkPath + File.separator);  // used for some entries that are shortened
         List<String> tokens = tokenize(input);
         for (int i = 0; i < tokens.size(); i++) {
             String option = tokens.get(i);
             if (optionsUIIdMap.containsKey(option)) {
                 v = sda.findViewById(optionsUIIdMap.get(option));
+                String optionValue;
                 if (v instanceof EditText) {
-                    ((EditText) v).setText(tokens.get(++i));
+                    if (++i < tokens.size()) {
+                        optionValue = tokens.get(i);
+                        if (v.equals(t5xxlEditor) || v.equals(llmEditor) || v.equals(vaeEditor) || v.equals(clip_lEditor)) {
+                            optionValue = optionValue.replaceFirst(workPathPattern, "");
+                        }
+                        v.requestFocus();
+                        ((EditText) v).setText(optionValue);
+                    }
                 } else {
                     if (v instanceof Spinner) {
-                        String optionValue = tokens.get(++i);
-                        if (v.equals(sda.findViewById(R.id.model_spinner))) {
-                            // entries of this spinner are shortened
-                            optionValue = optionValue.substring(sda.sdWorkPath.length() + 1);
-                        }
-                        //noinspection unchecked
-                        ArrayAdapter<String> adapter = (ArrayAdapter<String>) ((Spinner) v).getAdapter();
-                        if (adapter.getPosition(optionValue) >= 0) {
-                            ((Spinner) v).setSelection(adapter.getPosition(optionValue));
+                        if (++i < tokens.size()) {
+                            optionValue = tokens.get(i);
+                            if (v.equals(sda.findViewById(R.id.model_spinner))) {
+                                optionValue = optionValue.replaceFirst(workPathPattern, "");
+                            }
+                            //noinspection unchecked
+                            ArrayAdapter<String> adapter = (ArrayAdapter<String>) ((Spinner) v).getAdapter();
+                            if (adapter.getPosition(optionValue) >= 0) {
+                                ((Spinner) v).setSelection(adapter.getPosition(optionValue));
+                            }
                         }
                     } else {
                         if (v instanceof CheckBox) {
