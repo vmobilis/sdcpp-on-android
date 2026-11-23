@@ -92,7 +92,7 @@ public class SDActivity extends AppCompatActivity {
             "\\s";
 
     private EditText promptEditor, negativeEditor, seedEditor, stepsEditor,
-            widthEditor, heightEditor, cfgscaleEditor, optionsEditor, t5xxlEditor;
+            widthEditor, heightEditor, cfgscaleEditor, optionsEditor, t5xxlEditor, llmEditor, vaeEditor, clip_lEditor;
     private CheckBox taesdchecker, taesdXLchecker, embeddchecker, gpuchecker, writeCmdlineChecker, vaetilingchecker, convdirectchecker;
     private View wrapperView;
     private ListView sdLogView;
@@ -319,6 +319,12 @@ public class SDActivity extends AppCompatActivity {
         setupEditText(optionsEditor, EditResetter.class);
         t5xxlEditor = findViewById(R.id.stringt5xxl);
         setupEditText(t5xxlEditor, EditFileSelector.class);
+        llmEditor = findViewById(R.id.stringllm);
+        setupEditText(llmEditor, EditFileSelector.class);
+        clip_lEditor = findViewById(R.id.stringclip_l);
+        setupEditText(clip_lEditor, EditFileSelector.class);
+        vaeEditor = findViewById(R.id.stringvae);
+        setupEditText(vaeEditor, EditFileSelector.class);
         stepsEditor = findViewById(R.id.stringsteps);
         setupEditText(stepsEditor, null);
         seedEditor = findViewById(R.id.stringseed);
@@ -497,24 +503,36 @@ public class SDActivity extends AppCompatActivity {
                 arguments.add("--diffusion-conv-direct");
                 arguments.add("--vae-conv-direct");
             }
-
-            String t5 = t5xxlEditor.getText().toString();
-            if (!t5.isEmpty()) {
-                arguments.add("--t5xxl");
-                arguments.add(t5);
-            }
-
             if (!selectedQuant.equals(DEFAULT_QUANTIZER)) {
                 arguments.add("--type");
                 arguments.add(selectedQuant);
             }
-            if (model.contains("MINIT2I") || model.contains("ZIMAGE")) {
+            if (model.contains("MINIT2I") || model.contains("ZIMAGE") || model.contains("FLUX")) {
                 arguments.set(1, "--diffusion-model"); // replace "-m"
-                // Currently other needed options like "--t5xxl" or "--llm" or "--vae" must be entered via "additional options"
             }
             if (!gpuchecker.isChecked()) {
                 sdFileName = SDlib;
             } else {
+                String val = t5xxlEditor.getText().toString();
+                if (!val.isEmpty()) {
+                    arguments.add("--t5xxl");
+                    arguments.add(sdWorkPath + File.separator + val);
+                }
+                val = vaeEditor.getText().toString();
+                if (!val.isEmpty()) {
+                    arguments.add("--vae");
+                    arguments.add(sdWorkPath + File.separator + val);
+                }
+                val = llmEditor.getText().toString();
+                if (!val.isEmpty()) {
+                    arguments.add("--llm");
+                    arguments.add(sdWorkPath + File.separator + val);
+                }
+                val = clip_lEditor.getText().toString();
+                if (!val.isEmpty()) {
+                    arguments.add("--clip_l");
+                    arguments.add(sdWorkPath + File.separator + val);
+                }
                 sdFileName = SDlibopenCL;
                 tempFolderPath = getApplicationContext().getCacheDir().getAbsolutePath();
                 libPath += ":" + libVendorPath;
@@ -533,18 +551,32 @@ public class SDActivity extends AppCompatActivity {
                     .replaceAll("(^" + anySpace + "+)|(" + anySpace + "+$)", "")
                     // arg1 "arg2"  "arg3 with spaces"   ""
                     .split(anySpace + "+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
-
-            // disable any manual options filtering
-            /*
-            for (int i = 0; i < args.length; i++) {
-                if (("-o".equals(args[i]) || "--output".equals(args[i])) && i < args.length - 1) {
+            int batchsize = 1;
+            for (int i = 0; i < args.length - 1; i++) {
+// disable any manual options filtering
+/*
+                if ("-o".equals(args[i]) || "--output".equals(args[i])) {
                     i++; // get next arg and remove dangerous chars
                     args[i] = args[i].replaceAll("[^a-zA-Z0-9._-]", "") + selectedExt;
                     localOutputImagePath = sdWorkPath + "/" + args[i];
-                }
+                } else {
+//*/
+                    if ("-b".equals(args[i]) || "--batch-count".equals(args[i])) {
+                        try {
+                            i++; // get next arg (batch count)
+                            batchsize = Math.max(Integer.parseInt(args[i]), 1);
+                        } catch (NumberFormatException ex) {
+                            batchsize = 1;
+                        }
+                        args[i] = batchsize + "";
+                    }
+//                }
             }
-            //*/
-
+            if (batchsize > 1) {
+                // use the first picture for display e,g, outputX_0.png
+                // (file names like outputX_%03d is not yet supported)
+                localOutputImagePath = localOutputImagePath.replaceFirst("^(.*)(\\.[^.]+)$", "$1_0$2");
+            }
             if (!args[0].isEmpty()) arguments.addAll(Arrays.asList(args));
             if (writeCmdlineChecker.isChecked()) {
                 try {
@@ -745,7 +777,6 @@ public class SDActivity extends AppCompatActivity {
             viewWindow.setBackgroundDrawable(new ColorDrawable(Color.BLACK));
             coverView.setAlpha(0.0f);
             closeButton.setVisibility(View.VISIBLE);
-
             GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
                 @Override
                 public boolean onSingleTapConfirmed(@NonNull MotionEvent e) {
@@ -1100,10 +1131,9 @@ public class SDActivity extends AppCompatActivity {
             convdirectchecker.setChecked(checked);
             String model = selectedModelfile.toUpperCase();
             if (gpuchecker.isChecked()) {
-                // these settings seem to work quite well at openCL/ADRENO 810
-                // "f16" is optimal for huge VRAM or very small models like SDXS
-                selectSpinnerString(quant_spinner,
-                        model.contains("SDXS") ? "f16" : "q4_0");
+                selectSpinnerString(quant_spinner, "default");
+                //selectSpinnerString(quant_spinner,
+                //        model.contains("SDXS") ? "f16" : "q4_0");
             } else {  // cpu
                 // for some budget devices with low RAM and NO usable openCL drivers:
                 if (model.contains("SSD")) {
@@ -1144,6 +1174,9 @@ public class SDActivity extends AppCompatActivity {
         editsMap.put(R.id.stringnegprompt, SDViewModel.prefsKeyNegPrompt);
         editsMap.put(R.id.stringopt, SDViewModel.prefsKeyOptions);
         editsMap.put(R.id.stringt5xxl, SDViewModel.prefsKeyT5xxl);
+        editsMap.put(R.id.stringllm, SDViewModel.prefsKeyLlm);
+        editsMap.put(R.id.stringclip_l, SDViewModel.prefsKeyClip_l);
+        editsMap.put(R.id.stringvae, SDViewModel.prefsKeyVae);
         editsMap.put(R.id.stringsteps, SDViewModel.prefsKeySteps);
         editsMap.put(R.id.stringseed, SDViewModel.prefsKeySeed);
         editsMap.put(R.id.stringwidth, SDViewModel.prefsKeyWidth);
@@ -1249,23 +1282,28 @@ public class SDActivity extends AppCompatActivity {
         }
         @Override
         public void run() {
-            FileSelector.actionForFileSelector actionToBeExecuted = new action(v);
+            FileSelector.actionForFileSelector actionToBeExecuted = new action(v, myActivity.sdWorkPath.length() + 1);
             FileSelector fsel = new FileSelector(myActivity, -1, ".safetensors|.gguf", "");
             fsel.recursiveFolderBrowser(new File(myActivity.sdWorkPath), actionToBeExecuted);
         }
     }
 
     public static class action implements FileSelector.actionForFileSelector {
-        EditText editText;
+        private final EditText editText;
+        private final int substr_begin;
 
         public void actOn(File selectedItem) {
             if (selectedItem != null) {
-                editText.setText(selectedItem.getAbsolutePath());
+                // entries of this editText are shortened
+                editText.requestFocus();
+                editText.setText(selectedItem.getAbsolutePath().substring(substr_begin));
             }
         }
 
-        public action(EditText editText) {
+        public action(EditText editText, int substr_begin) {
             this.editText = editText;
+            this.substr_begin = substr_begin;
         }
     }
+
 }
