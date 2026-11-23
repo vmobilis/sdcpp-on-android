@@ -309,9 +309,6 @@ public class SDActivity extends AppCompatActivity {
         }
         setupLogWindow();
 
-
-        Button fileSelectButton = findViewById(R.id.fileSelectButton);
-        fileSelectButton.setOnClickListener(new SDUIoptionsLoader());
         promptEditor = findViewById(R.id.stringprompt);
         setupEditText(promptEditor);
         promptEditor.addTextChangedListener(createTextWatcher());
@@ -331,6 +328,9 @@ public class SDActivity extends AppCompatActivity {
         setupEditText(heightEditor);
         cfgscaleEditor = findViewById(R.id.stringcfgscale);
         setupEditText(cfgscaleEditor);
+
+        Button fileSelectButton = findViewById(R.id.fileSelectButton);
+        fileSelectButton.setOnClickListener(new SDUIoptionsLoader());
         Button submitButton = findViewById(R.id.submitButton);
 
         fileList = listExternalFiles(sdWorkPath);
@@ -340,7 +340,6 @@ public class SDActivity extends AppCompatActivity {
         }
         Collections.sort(fileList);
         model_spinner = findViewById(R.id.model_spinner);
-        model_spinner.setOnItemSelectedListener(new ItemSelectedListener());
         ArrayAdapter<String> model_adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, fileList);
         model_adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         model_spinner.setAdapter(model_adapter);
@@ -499,8 +498,10 @@ public class SDActivity extends AppCompatActivity {
             }
 
             String t5 = t5xxlEditor.getText().toString();
-            arguments.add("--t5xxl");
-            arguments.add(t5.isEmpty() ? "\"\"" : t5);
+            if (!t5.isEmpty()) {
+                arguments.add("--t5xxl");
+                arguments.add(t5);
+            }
 
             if (!selectedQuant.equals(DEFAULT_QUANTIZER)) {
                 arguments.add("--type");
@@ -531,6 +532,9 @@ public class SDActivity extends AppCompatActivity {
                     .replaceAll("(^" + anySpace + "+)|(" + anySpace + "+$)", "")
                     // arg1 "arg2"  "arg3 with spaces"   ""
                     .split(anySpace + "+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+
+            // disable any manual options filtering
+            /*
             for (int i = 0; i < args.length; i++) {
                 if (("-o".equals(args[i]) || "--output".equals(args[i])) && i < args.length - 1) {
                     i++; // get next arg and remove dangerous chars
@@ -538,6 +542,8 @@ public class SDActivity extends AppCompatActivity {
                     localOutputImagePath = sdWorkPath + "/" + args[i];
                 }
             }
+            //*/
+
             if (!args[0].isEmpty()) arguments.addAll(Arrays.asList(args));
             if (writeCmdlineChecker.isChecked()) {
                 try {
@@ -968,7 +974,7 @@ public class SDActivity extends AppCompatActivity {
         };
     }
 
-    public class ItemSelectedListener implements AdapterView.OnItemSelectedListener {
+    final private AdapterView.OnItemSelectedListener spinnerListener = new AdapterView.OnItemSelectedListener() {
         @Override
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
             if (parent.getId() == R.id.model_spinner) {
@@ -1017,9 +1023,7 @@ public class SDActivity extends AppCompatActivity {
         @Override
         public void onNothingSelected(AdapterView<?> parent) {
         }
-    }
-
-    final private ItemSelectedListener spinnerListener = new ItemSelectedListener();
+    };
 
     final private static Map<Integer, String> spinnersMap = new HashMap<>();
 
@@ -1138,7 +1142,7 @@ public class SDActivity extends AppCompatActivity {
         editsMap.put(R.id.stringprompt, SDViewModel.prefsKeyPrompt);
         editsMap.put(R.id.stringnegprompt, SDViewModel.prefsKeyNegPrompt);
         editsMap.put(R.id.stringopt, SDViewModel.prefsKeyOptions);
-        editsMap.put(R.id.stringt5xxl, SDViewModel.prefst5xxlOptions);
+        editsMap.put(R.id.stringt5xxl, SDViewModel.prefsKeyT5xxl);
         editsMap.put(R.id.stringsteps, SDViewModel.prefsKeySteps);
         editsMap.put(R.id.stringseed, SDViewModel.prefsKeySeed);
         editsMap.put(R.id.stringwidth, SDViewModel.prefsKeyWidth);
