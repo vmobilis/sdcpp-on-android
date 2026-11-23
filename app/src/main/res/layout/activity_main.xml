@@ -494,26 +494,6 @@
                             android:orientation="vertical">
 
                             <TextView
-                                android:id="@+id/stringoptmsg"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="@string/field_options"
-                                android:labelFor="@id/stringopt"
-                                android:textAppearance="?android:attr/textAppearanceMedium" />
-
-                            <EditText
-                                android:id="@+id/stringopt"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="text"
-                                android:labelFor="@id/stringoptmsg"
-                                android:singleLine="true"
-                                android:text="--fa"
-                                android:drawablePadding="10dp"
-                                android:drawableEnd="@android:drawable/ic_menu_close_clear_cancel"
-                                tools:ignore="Autofill,TouchTargetSizeCheck" />
-
-                            <TextView
                                 android:id="@+id/stringt5xxlmsg"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -526,11 +506,31 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:inputType="text"
-                                android:labelFor="@id/stringt5xxlmsg"
+                                android:labelFor="@id/stringpromptmsg"
                                 android:singleLine="false"
                                 android:text=""
                                 android:drawablePadding="10dp"
                                 android:drawableEnd="@android:drawable/ic_menu_manage"
+                                tools:ignore="Autofill,TouchTargetSizeCheck" />
+
+                            <TextView
+                                android:id="@+id/stringoptmsg"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/field_options"
+                                android:labelFor="@id/stringprompt"
+                                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                            <EditText
+                                android:id="@+id/stringopt"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="text"
+                                android:labelFor="@id/stringpromptmsg"
+                                android:singleLine="true"
+                                android:text="--fa"
+                                android:drawablePadding="10dp"
+                                android:drawableEnd="@android:drawable/ic_menu_close_clear_cancel"
                                 tools:ignore="Autofill,TouchTargetSizeCheck" />
 
                         </LinearLayout>
