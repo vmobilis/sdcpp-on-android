@@ -47,6 +47,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.lifecycle.ViewModelProvider;
@@ -310,24 +311,24 @@ public class SDActivity extends AppCompatActivity {
         setupLogWindow();
 
         promptEditor = findViewById(R.id.stringprompt);
-        setupEditText(promptEditor);
+        setupEditText(promptEditor, EditResetter.class);
         promptEditor.addTextChangedListener(createTextWatcher());
         negativeEditor = findViewById(R.id.stringnegprompt);
-        setupEditText(negativeEditor);
+        setupEditText(negativeEditor, EditResetter.class);
         optionsEditor = findViewById(R.id.stringopt);
-        setupEditText(optionsEditor);
+        setupEditText(optionsEditor, EditResetter.class);
         t5xxlEditor = findViewById(R.id.stringt5xxl);
-        setupEditText(t5xxlEditor);
+        setupEditText(t5xxlEditor, EditFileSelector.class);
         stepsEditor = findViewById(R.id.stringsteps);
-        setupEditText(stepsEditor);
+        setupEditText(stepsEditor, null);
         seedEditor = findViewById(R.id.stringseed);
-        setupEditText(seedEditor);
+        setupEditText(seedEditor, null);
         widthEditor = findViewById(R.id.stringwidth);
-        setupEditText(widthEditor);
+        setupEditText(widthEditor, null);
         heightEditor = findViewById(R.id.stringheight);
-        setupEditText(heightEditor);
+        setupEditText(heightEditor, null);
         cfgscaleEditor = findViewById(R.id.stringcfgscale);
-        setupEditText(cfgscaleEditor);
+        setupEditText(cfgscaleEditor, null);
 
         Button fileSelectButton = findViewById(R.id.fileSelectButton);
         fileSelectButton.setOnClickListener(new SDUIoptionsLoader());
@@ -1163,7 +1164,7 @@ public class SDActivity extends AppCompatActivity {
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    private void setupEditText(EditText editText) {
+    private void setupEditText(EditText editText, @Nullable Class<? extends EditRunnable> editRunnable) {
         String key = editsMap.get(editText.getId());
         if (key == null) {
             // id-key pair must be defined in editsMap
@@ -1176,11 +1177,16 @@ public class SDActivity extends AppCompatActivity {
             editText.setText(tn);
         }
         editText.setOnFocusChangeListener(editFocusListener);
-        if (editText == promptEditor || editText == negativeEditor || editText == optionsEditor) {
-            editText.setOnTouchListener(editTouchListenerResetText);
-        }
-        if (editText == t5xxlEditor) {
-            editText.setOnTouchListener(editTouchListenerGetFileName);
+        if (editRunnable != null) {
+            try {
+                editText.setOnTouchListener(new EditTouchListener(
+                        this,
+                        editText,
+                        editRunnable.getDeclaredConstructor(SDActivity.class, EditText.class).newInstance(this, editText)
+                ));
+            } catch (Exception ignored) {
+                Toast.makeText(myActivity, "setupEditText(): cannot find constructor of EditRunnable descendant", Toast.LENGTH_LONG).show();
+            }
         }
     }
 
@@ -1192,20 +1198,62 @@ public class SDActivity extends AppCompatActivity {
         }
     };
 
-    final private View.OnTouchListener editTouchListenerResetText = (v, event) -> {
-        if (event.getAction() == MotionEvent.ACTION_UP) {
-            v.performClick();
-            if (((EditText) v).getCompoundDrawables()[2] != null) {
-                int iconWidth = ((EditText) v).getCompoundDrawables()[2].getBounds().width();
-                if (event.getRawX() >= (v.getRight() - iconWidth - (v).getPaddingEnd())) {
-                    ((EditText) v).setText("");
-                    v.performClick();
-                    return true;
+    private final static class EditTouchListener implements View.OnTouchListener {
+        final GestureDetector clickDectector;
+        EditTouchListener(Context ctx, EditText v, Runnable runnable) {
+            clickDectector = new GestureDetector(ctx, new GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public boolean onSingleTapConfirmed(@NonNull MotionEvent event) {
+                    if (v.getLayoutDirection() == View.LAYOUT_DIRECTION_LTR
+                            ? event.getX() >= v.getWidth() - v.getCompoundPaddingEnd() + v.getCompoundDrawablePadding()
+                            : event.getX() <= v.getCompoundPaddingEnd() - v.getCompoundDrawablePadding()) {
+                        runnable.run();
+                        v.performClick();
+                        return true;
+                    }
+                    return false;
                 }
-            }
+            });
         }
-        return false;
-    };
+        @SuppressLint("ClickableViewAccessibility")
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            return clickDectector.onTouchEvent(event);
+        }
+    }
+
+    private static abstract class EditRunnable implements Runnable {
+        final SDActivity myActivity;
+        final EditText v;
+        EditRunnable(SDActivity a, EditText v) {
+            myActivity = a;
+            this.v = v;
+        }
+        @Override
+        public abstract void run();
+    }
+
+    private static final class EditResetter extends EditRunnable {
+        EditResetter(SDActivity a, EditText v) {
+            super(a, v);
+        }
+        @Override
+        public void run() {
+            v.setText("");
+        }
+    }
+
+    private static final class EditFileSelector extends EditRunnable {
+        EditFileSelector(SDActivity a, EditText v) {
+            super(a, v);
+        }
+        @Override
+        public void run() {
+            FileSelector.actionForFileSelector actionToBeExecuted = new action(v);
+            FileSelector fsel = new FileSelector(myActivity, -1, ".safetensors|.gguf", "");
+            fsel.recursiveFolderBrowser(new File(myActivity.sdWorkPath), actionToBeExecuted);
+        }
+    }
 
     public static class action implements FileSelector.actionForFileSelector {
         EditText editText;
@@ -1220,21 +1268,4 @@ public class SDActivity extends AppCompatActivity {
             this.editText = editText;
         }
     }
-
-    final private View.OnTouchListener editTouchListenerGetFileName = (v, event) -> {
-        if (event.getAction() == MotionEvent.ACTION_UP) {
-            v.performClick();
-            if (((EditText) v).getCompoundDrawables()[2] != null) {
-                int iconWidth = ((EditText) v).getCompoundDrawables()[2].getBounds().width();
-                if (event.getRawX() >= (v.getRight() - iconWidth - (v).getPaddingEnd())) {
-                    FileSelector.actionForFileSelector actionToBeExecuted = new action((EditText) v);
-                    FileSelector fsel = new FileSelector(this, -1, ".safetensors|.gguf", "");
-                    fsel.recursiveFolderBrowser(new File(sdWorkPath), actionToBeExecuted);
-                    v.performClick();
-                    return true;
-                }
-            }
-        }
-        return false;
-    };
 }
