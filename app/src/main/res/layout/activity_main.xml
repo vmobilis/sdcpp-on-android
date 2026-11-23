@@ -507,9 +507,10 @@
                                 android:layout_height="wrap_content"
                                 android:inputType="text"
                                 android:labelFor="@id/stringpromptmsg"
-                                android:singleLine="false"
+                                android:singleLine="true"
                                 android:text=""
                                 android:drawablePadding="10dp"
+                                android:drawableTint="@color/teal_200"
                                 android:drawableEnd="@android:drawable/ic_menu_manage"
                                 tools:ignore="Autofill,TouchTargetSizeCheck" />
 
@@ -525,14 +526,13 @@
                                 android:id="@+id/stringopt"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:inputType="text"
+                                android:inputType="textMultiLine"
                                 android:labelFor="@id/stringpromptmsg"
-                                android:singleLine="true"
+                                android:singleLine="false"
                                 android:text="--fa"
                                 android:drawablePadding="10dp"
                                 android:drawableEnd="@android:drawable/ic_menu_close_clear_cancel"
                                 tools:ignore="Autofill,TouchTargetSizeCheck" />
-
                         </LinearLayout>
 
                         <LinearLayout
