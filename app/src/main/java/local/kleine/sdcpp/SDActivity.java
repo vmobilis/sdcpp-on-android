@@ -1086,7 +1086,10 @@ public class SDActivity extends AppCompatActivity {
         String tn = vm.getPrefString(key, to);
         if (!tn.equals(to))
             selectSpinnerString(spinner, tn);
-        spinner.setOnItemSelectedListener(spinnerListener);
+        // setting listener in post() to avoid race condition
+        spinner.post(() -> {
+            spinner.setOnItemSelectedListener(spinnerListener);
+        });
     }
 
     final private static Map<Integer, String> checkboxesMap = new HashMap<>();
@@ -1163,8 +1166,11 @@ public class SDActivity extends AppCompatActivity {
         if (current != needed)
             checkBox.setChecked(needed);
         // setting the listener after the state change,
-        // to not override user settings during setup
-        checkBox.setOnCheckedChangeListener(listener);
+        // to not override user settings during setup;
+        // using post() to avoid race condition
+        checkBox.post(() -> {
+            checkBox.setOnCheckedChangeListener(listener);
+        });
     }
 
     final private static Map<Integer, String> editsMap = new HashMap<>();
@@ -1209,18 +1215,27 @@ public class SDActivity extends AppCompatActivity {
         if (!tn.equals(to)) {
             editText.setText(tn);
         }
-        editText.setOnFocusChangeListener(editFocusListener);
+        // setting listeners in post() to avoid race condition
         if (editRunnable != null) {
-            try {
-                editText.setOnTouchListener(new EditTouchListener(
-                        this,
-                        editText,
-                        editRunnable.getDeclaredConstructor(SDActivity.class, EditText.class).newInstance(this, editText)
-                ));
-            } catch (Exception ignored) {
-                Toast.makeText(myActivity, "setupEditText(): cannot find constructor of EditRunnable descendant", Toast.LENGTH_LONG).show();
-            }
+            editText.post(() -> {
+                EditTouchListener listener = null;
+                try {
+                    listener = new EditTouchListener(
+                            SDActivity.this,
+                            editText,
+                            editRunnable.getDeclaredConstructor(SDActivity.class, EditText.class).newInstance(SDActivity.this, editText)
+                    );
+                } catch (Exception ignored) {
+                    Toast.makeText(myActivity, "setupEditText(): cannot find constructor of EditRunnable descendant", Toast.LENGTH_LONG).show();
+                }
+                if (listener != null) {
+                    editText.setOnTouchListener(listener);
+                }
+            });
         }
+        editText.post(() -> {
+            editText.setOnFocusChangeListener(editFocusListener);
+        });
     }
 
     final private View.OnFocusChangeListener editFocusListener = (v, hasFocus) -> {
@@ -1233,7 +1248,7 @@ public class SDActivity extends AppCompatActivity {
 
     private final static class EditTouchListener implements View.OnTouchListener {
         final GestureDetector clickDectector;
-        EditTouchListener(Context ctx, EditText v, Runnable runnable) {
+        EditTouchListener(@NonNull Context ctx, @NonNull EditText v, @NonNull Runnable runnable) {
             clickDectector = new GestureDetector(ctx, new GestureDetector.SimpleOnGestureListener() {
                 @Override
                 public boolean onSingleTapConfirmed(@NonNull MotionEvent event) {
@@ -1256,9 +1271,11 @@ public class SDActivity extends AppCompatActivity {
     }
 
     private static abstract class EditRunnable implements Runnable {
+        @NonNull
         final SDActivity myActivity;
+        @NonNull
         final EditText v;
-        EditRunnable(SDActivity a, EditText v) {
+        EditRunnable(@NonNull SDActivity a, @NonNull EditText v) {
             myActivity = a;
             this.v = v;
         }
@@ -1267,7 +1284,7 @@ public class SDActivity extends AppCompatActivity {
     }
 
     private static final class EditResetter extends EditRunnable {
-        EditResetter(SDActivity a, EditText v) {
+        EditResetter(@NonNull SDActivity a, @NonNull EditText v) {
             super(a, v);
         }
         @Override
@@ -1277,7 +1294,7 @@ public class SDActivity extends AppCompatActivity {
     }
 
     private static final class EditFileSelector extends EditRunnable {
-        EditFileSelector(SDActivity a, EditText v) {
+        EditFileSelector(@NonNull SDActivity a, @NonNull EditText v) {
             super(a, v);
         }
         @Override
