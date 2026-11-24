@@ -1087,9 +1087,7 @@ public class SDActivity extends AppCompatActivity {
         if (!tn.equals(to))
             selectSpinnerString(spinner, tn);
         // setting listener in post() to avoid race condition
-        spinner.post(() -> {
-            spinner.setOnItemSelectedListener(spinnerListener);
-        });
+        spinner.post(() -> spinner.setOnItemSelectedListener(spinnerListener));
     }
 
     final private static Map<Integer, String> checkboxesMap = new HashMap<>();
@@ -1168,9 +1166,7 @@ public class SDActivity extends AppCompatActivity {
         // setting the listener after the state change,
         // to not override user settings during setup;
         // using post() to avoid race condition
-        checkBox.post(() -> {
-            checkBox.setOnCheckedChangeListener(listener);
-        });
+        checkBox.post(() -> checkBox.setOnCheckedChangeListener(listener));
     }
 
     final private static Map<Integer, String> editsMap = new HashMap<>();
@@ -1233,9 +1229,7 @@ public class SDActivity extends AppCompatActivity {
                 }
             });
         }
-        editText.post(() -> {
-            editText.setOnFocusChangeListener(editFocusListener);
-        });
+        editText.post(() -> editText.setOnFocusChangeListener(editFocusListener));
     }
 
     final private View.OnFocusChangeListener editFocusListener = (v, hasFocus) -> {
@@ -1246,7 +1240,7 @@ public class SDActivity extends AppCompatActivity {
         }
     };
 
-    final private void updEditAndPref(@NonNull EditText edit, @NonNull String text) {
+    private void updEditAndPref(@NonNull EditText edit, @NonNull String text) {
         // setting EditText and saving to preferences
         edit.setText(text);
         String key = editsMap.get(edit.getId());
