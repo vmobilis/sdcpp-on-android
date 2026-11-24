@@ -1017,8 +1017,8 @@ public class SDActivity extends AppCompatActivity {
                 boolean isSTAR = model.contains("STAR");
                 boolean isNITRO = model.contains("NITRO");
                 if (isSDXS || isSTAR || isNITRO) {
-                    stepsEditor.setText("1");
-                    cfgscaleEditor.setText("1");
+                    updEditAndPref(stepsEditor, "1");
+                    updEditAndPref(cfgscaleEditor, "1");
                     selectSpinnerString(scheduler_spinner,
                             isSDXS ? SCHEDULER_DISCRETE : SCHEDULER_SGM_UNIFORM);
                 }
@@ -1036,8 +1036,8 @@ public class SDActivity extends AppCompatActivity {
             } else if (parent.getId() == R.id.sampler_spinner) {
                 selectedSampler = sampler_spinner.getSelectedItem().toString();
                 if (selectedSampler.contains("lcm")) {
-                    stepsEditor.setText("4");
-                    cfgscaleEditor.setText("1");
+                    updEditAndPref(stepsEditor, "4");
+                    updEditAndPref(cfgscaleEditor, "1");
                 }
             } else if (parent.getId() == R.id.scheduler_spinner) {
                 selectedScheduler = scheduler_spinner.getSelectedItem().toString();
@@ -1246,6 +1246,15 @@ public class SDActivity extends AppCompatActivity {
         }
     };
 
+    final private void updEditAndPref(@NonNull EditText edit, @NonNull String text) {
+        // setting EditText and saving to preferences
+        edit.setText(text);
+        String key = editsMap.get(edit.getId());
+        if (key != null) {
+            vm.setPrefString(key, text);
+        }
+    }
+
     private final static class EditTouchListener implements View.OnTouchListener {
         final GestureDetector clickDectector;
         EditTouchListener(@NonNull Context ctx, @NonNull EditText v, @NonNull Runnable runnable) {
@@ -1289,7 +1298,7 @@ public class SDActivity extends AppCompatActivity {
         }
         @Override
         public void run() {
-            v.setText("");
+            myActivity.updEditAndPref(v, "");
         }
     }
 
@@ -1299,25 +1308,26 @@ public class SDActivity extends AppCompatActivity {
         }
         @Override
         public void run() {
-            FileSelector.actionForFileSelector actionToBeExecuted = new action(v, myActivity.sdWorkPath.length() + 1);
+            FileSelector.actionForFileSelector actionToBeExecuted = new action(myActivity, v, myActivity.sdWorkPath.length() + 1);
             FileSelector fsel = new FileSelector(myActivity, -1, ".safetensors|.gguf", "");
             fsel.recursiveFolderBrowser(new File(myActivity.sdWorkPath), actionToBeExecuted);
         }
     }
 
     public static class action implements FileSelector.actionForFileSelector {
+        private final SDActivity myActivity;
         private final EditText editText;
         private final int substr_begin;
 
         public void actOn(File selectedItem) {
             if (selectedItem != null) {
                 // entries of this editText are shortened
-                editText.requestFocus();
-                editText.setText(selectedItem.getAbsolutePath().substring(substr_begin));
+                myActivity.updEditAndPref(editText, selectedItem.getAbsolutePath().substring(substr_begin));
             }
         }
 
-        public action(EditText editText, int substr_begin) {
+        public action(SDActivity activity, EditText editText, int substr_begin) {
+            this.myActivity = activity;
             this.editText = editText;
             this.substr_begin = substr_begin;
         }
