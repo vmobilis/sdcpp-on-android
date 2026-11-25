@@ -69,20 +69,31 @@ public class SDActivity extends AppCompatActivity {
     private ArrayList<String> logList = null;
     private static sdIOThread sd_thread = null;
     private final Activity myActivity;
-    @NonNull
-    private String selectedModelfile = "";
-    private String selectedSampler, selectedScheduler, taesdModel, taesdXLModel;
+
+    // order should correspond spinSel[]
+    private final static int
+            SPINSEL_MODEL     = 0,
+            SPINSEL_SAMPLER   = 1,
+            SPINSEL_SCHEDULER = 2,
+            SPINSEL_EXTENSION = 3,
+            SPINSEL_QUANTIZER = 4;
+    // spinner selection cache, indexes should correspond SPINSEL_*
+    private final String[] spinSel =  new String[]{
+            "",
+            null,
+            null,
+            DEFAULT_EXT,
+            DEFAULT_QUANTIZER
+    };
+
+    private String taesdModel, taesdXLModel;
     private String sdProgramPath, helperPath, libPath, sdFileName; // Note: "sd" or "sd_cli" executable needs renaming because it is now located inside jniLibs
     private final static String libVendorPath = "/vendor/lib64";  // no support possible for 32 bit with openCL
     private final static String ChklibopenCL = "libchkopenCL.so";
     private final static String SDlibopenCL = "libsdopenCL.so";
     private final static String SDlib = "libsd.so";
-    private final static String defExt = ".jpg";
-    @NonNull
-    private String selectedExt = defExt;
+    private final static String DEFAULT_EXT = ".jpg";
     private final static String DEFAULT_QUANTIZER = "default";  // see @array/quant_entries
-    @NonNull
-    private String selectedQuant = DEFAULT_QUANTIZER;
     private File nativeLibDir;
     protected final String sdWorkPath = android.os.Environment.
             getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS).
@@ -334,15 +345,15 @@ public class SDActivity extends AppCompatActivity {
         ArrayAdapter<String> model_adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, fileList);
         model_adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         model_spinner.setAdapter(model_adapter);
-        setupSpinner(model_spinner);
+        setupSpinner(model_spinner, SPINSEL_MODEL);
         sampler_spinner = findViewById(R.id.sampler_spinner);
-        setupSpinner(sampler_spinner);
+        setupSpinner(sampler_spinner, SPINSEL_SAMPLER);
         scheduler_spinner = findViewById(R.id.scheduler_spinner);
-        setupSpinner(scheduler_spinner);
+        setupSpinner(scheduler_spinner, SPINSEL_SCHEDULER);
         ext_spinner = findViewById(R.id.ext_spinner);
-        setupSpinner(ext_spinner);
+        setupSpinner(ext_spinner, SPINSEL_EXTENSION);
         quant_spinner = findViewById(R.id.quant_spinner);
-        setupSpinner(quant_spinner);
+        setupSpinner(quant_spinner, SPINSEL_QUANTIZER);
 
         // animator setup
         LinearLayout animatedLayout = findViewById(R.id.details_animation);
@@ -429,7 +440,7 @@ public class SDActivity extends AppCompatActivity {
                 prompt = "something";
             }
             String negative = negativeEditor.getText().toString();
-            String localOutputImagePath = sdWorkPath + "/output" + (System.currentTimeMillis() / 1000L) + selectedExt;
+            String localOutputImagePath = sdWorkPath + "/output" + (System.currentTimeMillis() / 1000L) + spinSel[SPINSEL_EXTENSION];
             String taesdoption = "";
             if (taesdchecker.isChecked()) {
                 taesdoption = taesdModel;
@@ -439,20 +450,21 @@ public class SDActivity extends AppCompatActivity {
             }
             /* 0 */
             ArrayList<String> arguments = new ArrayList<>(Arrays.asList("",
-                    /* 1 2 */           "-m", sdWorkPath + File.separator + selectedModelfile,
+                    /* 1 2 */           "-m", sdWorkPath + File.separator + spinSel[SPINSEL_MODEL],
                     /* 3 4 */           "-p", prompt,
                     /* 5 6 */           "-n", negative,
                     /* 7 8 */           "-o", localOutputImagePath,
                     /* 9 10 */          "--lora-model-dir", helperPath,
                     /* 11 12 */         "--embd-dir", embeddchecker.isChecked() ? helperPath : "",
-                    /* 13 14 */         "--sampling-method", selectedSampler,
+                    /* 13 14 */         "--sampling-method", spinSel[SPINSEL_SAMPLER],
+
                     /* 15 16 */         "--taesd", taesdoption,
                     /* 17 18 */         "--cfg-scale", checkFloat(cfgscaleEditor.getText().toString(), "7.0"),
                     /* 19 20 */         "--seed", checkInt(seedEditor.getText().toString(), "-1"),
                     /* 21 22 */         "--steps", checkSteps(stepsEditor.getText().toString(), "25"),
                     /* 23 24 */         "--width", checkDimension(widthEditor.getText().toString(), "512"),
                     /* 25 26 */         "--height", checkDimension(heightEditor.getText().toString(), "512"),
-                    /* 27 28 */         "--scheduler", selectedScheduler,
+                    /* 27 28 */         "--scheduler", spinSel[SPINSEL_SCHEDULER],
                     /* 29 */            "-v"
                     // "--mmap"  // --params-backend seems to work better
             ));
@@ -460,7 +472,7 @@ public class SDActivity extends AppCompatActivity {
             // and we can overwrite earlier arguments by using optionsEditor's contents (at the end of list)
             libPath = nativeLibDir.toString();      // get openCL libs
             String tempFolderPath = "";
-            String model = selectedModelfile.toUpperCase();
+            String model = spinSel[SPINSEL_MODEL].toUpperCase();
             if (model.contains("NITROSD-REAL") ||
                     model.contains("DIFF-INSTRUCTSTAR")) {
                 arguments.add("--timestep-shift");
@@ -474,9 +486,9 @@ public class SDActivity extends AppCompatActivity {
                 arguments.add("--diffusion-conv-direct");
                 arguments.add("--vae-conv-direct");
             }
-            if (!selectedQuant.equals(DEFAULT_QUANTIZER)) {
+            if (!spinSel[SPINSEL_QUANTIZER].equals(DEFAULT_QUANTIZER)) {
                 arguments.add("--type");
-                arguments.add(selectedQuant);
+                arguments.add(spinSel[SPINSEL_QUANTIZER]);
             }
             if (model.contains("MINIT2I") || model.contains("ZIMAGE") || model.contains("FLUX")) {
                 arguments.set(1, "--diffusion-model"); // replace "-m"
@@ -570,7 +582,7 @@ public class SDActivity extends AppCompatActivity {
                             .replace("\\", "\\\\")
                             .replace("\"", "\\\"")
                             + "\"";  // negative prompt
-                    args[8] = "output" + selectedExt;
+                    args[8] = "output" + spinSel[SPINSEL_EXTENSION];
                     args[10] = "\"" + args[10] + "\"";
                     args[12] = "\"" + args[12] + "\"";
                     args[16] = "\"" + args[16] + "\"";
@@ -1030,9 +1042,9 @@ public class SDActivity extends AppCompatActivity {
         @Override
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
             if (parent.getId() == R.id.model_spinner) {
-                selectedModelfile = fileList.get(position);
+                String model = (spinSel[SPINSEL_MODEL] = fileList.get(position))
+                        .toUpperCase();
                 // here follow some lazy checks for easy defaults - just for the moment
-                String model = selectedModelfile.toUpperCase();
                 boolean isSDXS = model.contains("SDXS");
                 boolean isSTAR = model.contains("STAR");
                 boolean isNITRO = model.contains("NITRO");
@@ -1054,17 +1066,17 @@ public class SDActivity extends AppCompatActivity {
                     }
                 }
             } else if (parent.getId() == R.id.sampler_spinner) {
-                selectedSampler = sampler_spinner.getSelectedItem().toString();
-                if (selectedSampler.contains("lcm")) {
+                if ((spinSel[SPINSEL_SAMPLER] = sampler_spinner.getSelectedItem().toString())
+                        .contains("lcm")) {
                     updEditAndPref(stepsEditor, "4");
                     updEditAndPref(cfgscaleEditor, "1");
                 }
             } else if (parent.getId() == R.id.scheduler_spinner) {
-                selectedScheduler = scheduler_spinner.getSelectedItem().toString();
+                spinSel[SPINSEL_SCHEDULER] = scheduler_spinner.getSelectedItem().toString();
             } else if (parent.getId() == R.id.ext_spinner) {
-                selectedExt = ext_spinner.getSelectedItem().toString();
+                spinSel[SPINSEL_EXTENSION] = ext_spinner.getSelectedItem().toString();
             } else if (parent.getId() == R.id.quant_spinner) {
-                selectedQuant = quant_spinner.getSelectedItem().toString();
+                spinSel[SPINSEL_QUANTIZER] = quant_spinner.getSelectedItem().toString();
             }
             String key = spinnersMap.get(parent.getId());
             if (key != null) {
@@ -1094,7 +1106,7 @@ public class SDActivity extends AppCompatActivity {
         spinner.setSelection(Math.max(0, ((ArrayAdapter<String>) spinner.getAdapter()).getPosition(val)));
     }
 
-    private void setupSpinner(@NonNull Spinner spinner) {
+    private void setupSpinner(@NonNull Spinner spinner, int spinSelIndex) {
         String key = spinnersMap.get(spinner.getId());
         if (key == null) {
             // id-key pair must be defined in spinnersMap
@@ -1108,6 +1120,8 @@ public class SDActivity extends AppCompatActivity {
             selectSpinnerString(spinner, tn);
         // setting listener after selection to not modify other settings
         spinner.post(() -> spinner.setOnItemSelectedListener(spinnerListener));
+        // setting value in spinner selection cache manually
+        spinSel[spinSelIndex] = tn;
     }
 
     final private static Map<Integer, String> checkboxesMap = new HashMap<>();
@@ -1150,7 +1164,7 @@ public class SDActivity extends AppCompatActivity {
         public void onCheckedChanged(CompoundButton compoundButton, boolean checked) {
             vaetilingchecker.setChecked(!checked);  // currently not for openCL
             convdirectchecker.setChecked(checked);
-            String model = selectedModelfile.toUpperCase();
+            String model = spinSel[SPINSEL_MODEL].toUpperCase();
             if (gpuchecker.isChecked()) {
                 selectSpinnerString(quant_spinner, "default");
                 //selectSpinnerString(quant_spinner,
