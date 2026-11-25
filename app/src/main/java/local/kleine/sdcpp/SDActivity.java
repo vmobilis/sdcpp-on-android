@@ -297,18 +297,6 @@ public class SDActivity extends AppCompatActivity {
         }
 
         nativeLibDir = new File(getApplicationInfo().nativeLibraryDir);
-        boolean canUseOpenCL = false;
-        if (checkOpenCLdriver()) {
-            final String[] libs = nativeLibDir.list();
-            if (libs != null) {
-                for (String lib : libs) {
-                    if (lib.equals(SDlibopenCL)) {
-                        canUseOpenCL = true;
-                        break;
-                    }
-                }
-            }
-        }
 
         // EditTexts
         promptEditor = findViewById(R.id.stringprompt);
@@ -339,10 +327,8 @@ public class SDActivity extends AppCompatActivity {
 
         // fills taesdModel, taesdXLModel, helperPath
         fileList = listExternalFiles(sdWorkPath);
-        if (fileList.isEmpty()) {
-            submitButton.setEnabled(false);
-            fileList.add("At first copy SD model file to this device.");
-        }
+
+        // spinners
         Collections.sort(fileList);
         model_spinner = findViewById(R.id.model_spinner);
         ArrayAdapter<String> model_adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, fileList);
@@ -403,46 +389,28 @@ public class SDActivity extends AppCompatActivity {
 
         // checkboxes
         taesdchecker = findViewById(R.id.taesdchecker);
-        taesdXLchecker = findViewById(R.id.taesdXLchecker);
-        embeddchecker = findViewById(R.id.embeddchecker);
-        gpuchecker = findViewById(R.id.usegpu);
-        vaetilingchecker = findViewById(R.id.vaetiling);
-        convdirectchecker = findViewById(R.id.convdirect);
-        writeCmdlineChecker = findViewById(R.id.writecmdchecker);
-        CheckBox writeLogChecker = findViewById(R.id.writelogchecker);
-
         setupCheckBox(taesdchecker, true, taesdCheckListener);  // suggest by default
-        if (taesdModel.isEmpty()) {
-            // override user choice if Taesd is not available anymore
-            taesdchecker.setChecked(false);  // off state does not affect anything
-            taesdchecker.setEnabled(false);
-        } else {
+        if (!taesdModel.isEmpty()) {  // filled by listFilesRecursively()
             TextView taesdview = findViewById(R.id.taesdmodel);
             taesdview.setText(taesdModel.substring(taesdModel.lastIndexOf('/') + 1) + "  (in lora path)");
         }
+        taesdXLchecker = findViewById(R.id.taesdXLchecker);
         setupCheckBox(taesdXLchecker, true, taesdCheckListener);  // suggest by default
-        if (taesdXLModel.isEmpty()) {
-            // override user choice if TaesdXL is not available anymore
-            taesdXLchecker.setChecked(false);  // off state does not affect anything
-            taesdXLchecker.setEnabled(false);
-        } else {
+        if (!taesdXLModel.isEmpty()) {  // filled by listFilesRecursively()
             TextView taesdXLview = findViewById(R.id.taesdXLmodel);
             taesdXLview.setText(taesdXLModel.substring(taesdXLModel.lastIndexOf('/') + 1) + "  (in lora path)");
         }
+        embeddchecker = findViewById(R.id.embeddchecker);
         setupCheckBox(embeddchecker, false, onCheckedChangeListener);  // disable embeddings by default
-        if (helperPath.isEmpty()) {
-            embeddchecker.setChecked(false);  // off state does not affect anything
-            embeddchecker.setEnabled(false);
-        }
+        gpuchecker = findViewById(R.id.usegpu);
         setupCheckBox(gpuchecker, true, new GpuCheckListener());  // enable GPU by default
-        if (!canUseOpenCL) {
-            if (gpuchecker.isChecked())        // off state affects quantizaton, therefore
-                gpuchecker.setChecked(false);  // skipping unneccessary switching
-            gpuchecker.setEnabled(false);
-        }
+        vaetilingchecker = findViewById(R.id.vaetiling);
         setupCheckBox(vaetilingchecker, true, onCheckedChangeListener);  // enable by default to reduce memory
+        convdirectchecker = findViewById(R.id.convdirect);
         setupCheckBox(convdirectchecker, true, onCheckedChangeListener);
+        writeCmdlineChecker = findViewById(R.id.writecmdchecker);
         setupCheckBox(writeCmdlineChecker, true, onCheckedChangeListener);  // write command script by default
+        CheckBox writeLogChecker = findViewById(R.id.writelogchecker);
         setupCheckBox(writeLogChecker, true, onCheckedChangeListener);  // save log by default
 
         TextView loraPathView = findViewById(R.id.lorapath);
@@ -644,6 +612,46 @@ public class SDActivity extends AppCompatActivity {
             );
             return true;
         });
+
+//        return;  // for testing
+//*
+        // overriding user choices when it's impossible to use old settings
+        if (fileList.isEmpty()) {
+            submitButton.setEnabled(false);
+            fileList.add("At first copy SD model file to this device.");
+        }
+        boolean canUseOpenCL = false;
+        if (checkOpenCLdriver()) {
+            final String[] libs = nativeLibDir.list();
+            if (libs != null) {
+                for (String lib : libs) {
+                    if (lib.equals(SDlibopenCL)) {
+                        canUseOpenCL = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (taesdModel.isEmpty()) {
+            // override user choice if Taesd is not available anymore
+            taesdchecker.setChecked(false);  // off state does not affect anything
+            taesdchecker.setEnabled(false);
+        }
+        if (taesdXLModel.isEmpty()) {
+            // override user choice if TaesdXL is not available anymore
+            taesdXLchecker.setChecked(false);  // off state does not affect anything
+            taesdXLchecker.setEnabled(false);
+        }
+        if (helperPath.isEmpty()) {
+            embeddchecker.setChecked(false);  // off state does not affect anything
+            embeddchecker.setEnabled(false);
+        }
+        if (!canUseOpenCL) {
+            if (gpuchecker.isChecked())        // off state affects quantizaton, therefore
+                gpuchecker.setChecked(false);  // skipping unneccessary switching
+            gpuchecker.setEnabled(false);
+        }
+        //*/
 
     }
 
