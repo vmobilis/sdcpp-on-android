@@ -672,16 +672,21 @@ public class SDActivity extends AppCompatActivity {
 
     public void subFinished(int exitcode, final String msg) {
         runOnUiThread(() -> {
-            File file = new File(sd_thread.outputImagePath);
-            if (exitcode == 0 && file.exists()) {
+            /* When subFinished() is called from sdIOThread constructor,
+            ** sd_thread field should still be null.
+            ** Creating a local copy to avoid race condition
+            */
+            final sdIOThread thread = sd_thread;
+            File file = (thread == null) ? null : new File(thread.outputImagePath);
+            if (exitcode == 0 && file != null && file.exists()) {
                 imageOutputView.setVisibility(View.VISIBLE);
                 if (vm.getPrefBoolean(SDViewModel.prefsKeyLog, true)) {
                     StringBuilder sb = new StringBuilder();
-                    for (String line : sd_thread.outputArrayList)
+                    for (String line : thread.outputArrayList)
                         sb.append(line).append("\n");
                     String alllog = sb.toString();
                     try {
-                        BufferedWriter writer = new BufferedWriter(new FileWriter(sd_thread.outputImagePath + ".log.txt"));
+                        BufferedWriter writer = new BufferedWriter(new FileWriter(thread.outputImagePath + ".log.txt"));
                         writer.write(alllog);
                         writer.close();
                     } catch (IOException e) {
