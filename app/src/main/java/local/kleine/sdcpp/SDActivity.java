@@ -279,9 +279,9 @@ public class SDActivity extends AppCompatActivity {
 
     @SuppressLint("SetTextI18n")
     public void runSDcpp() {
+        setupLogWindow();
         if (sd_thread != null) {
             // SD.cpp is launched or was finished, displaying the log
-            setupLogWindow();
             wrapperView.setVisibility(View.GONE);
             addScreenDimmer();
             if (sd_thread.process != null)
@@ -295,6 +295,7 @@ public class SDActivity extends AppCompatActivity {
             }
             return;
         }
+
         nativeLibDir = new File(getApplicationInfo().nativeLibraryDir);
         boolean canUseOpenCL = false;
         if (checkOpenCLdriver()) {
@@ -308,8 +309,8 @@ public class SDActivity extends AppCompatActivity {
                 }
             }
         }
-        setupLogWindow();
 
+        // EditTexts
         promptEditor = findViewById(R.id.stringprompt);
         setupEditText(promptEditor, EditResetter.class);
         promptEditor.addTextChangedListener(createTextWatcher());
@@ -336,10 +337,7 @@ public class SDActivity extends AppCompatActivity {
         cfgscaleEditor = findViewById(R.id.stringcfgscale);
         setupEditText(cfgscaleEditor, null);
 
-        Button fileSelectButton = findViewById(R.id.fileSelectButton);
-        fileSelectButton.setOnClickListener(new SDUIoptionsLoader());
-        Button submitButton = findViewById(R.id.submitButton);
-
+        // fills taesdModel, taesdXLModel, helperPath
         fileList = listExternalFiles(sdWorkPath);
         if (fileList.isEmpty()) {
             submitButton.setEnabled(false);
@@ -403,8 +401,7 @@ public class SDActivity extends AppCompatActivity {
         detailsHeader.setOnClickListener(detailsToggler);
         detailsFooter.setOnClickListener(detailsToggler);
 
-        // checkboxes may switch each other, therefore
-        // all references are needed before setup
+        // checkboxes
         taesdchecker = findViewById(R.id.taesdchecker);
         taesdXLchecker = findViewById(R.id.taesdXLchecker);
         embeddchecker = findViewById(R.id.embeddchecker);
@@ -449,7 +446,13 @@ public class SDActivity extends AppCompatActivity {
         setupCheckBox(writeLogChecker, true, onCheckedChangeListener);  // save log by default
 
         TextView loraPathView = findViewById(R.id.lorapath);
+        // filled by listFilesRecursively()
         loraPathView.setText(helperPath);
+
+        // buttons
+        Button fileSelectButton = findViewById(R.id.fileSelectButton);
+        fileSelectButton.setOnClickListener(new SDUIoptionsLoader());
+        final Button submitButton = findViewById(R.id.submitButton);  // will be used in post(), therefore final
         submitButton.setOnClickListener(v -> {
             wrapperView.setVisibility(View.GONE);
             vm.savePreferences();
@@ -553,7 +556,11 @@ public class SDActivity extends AppCompatActivity {
                     .split(anySpace + "+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
             int batchsize = 1;
             for (int i = 0; i < args.length - 1; i++) {
-// disable any manual options filtering
+/* disabling any manual options filtering
+** because the program should provide safe defaults
+** and the user is solely responsible for whatever he inputs
+** and should himself correct errors introduced by him
+**/
 /*
                 if ("-o".equals(args[i]) || "--output".equals(args[i])) {
                     i++; // get next arg and remove dangerous chars
@@ -1091,7 +1098,7 @@ public class SDActivity extends AppCompatActivity {
         String tn = vm.getPrefString(key, to);
         if (!tn.equals(to))
             selectSpinnerString(spinner, tn);
-        // setting listener in post() to avoid race condition
+        // setting listener after selection to not modify other settings
         spinner.post(() -> spinner.setOnItemSelectedListener(spinnerListener));
     }
 
@@ -1147,7 +1154,7 @@ public class SDActivity extends AppCompatActivity {
                 } else if (model.contains("XL")) {
                     if (!model.contains("GGUF")) {
                         selectSpinnerString(quant_spinner, "q8_0");
-                    } // else keep as GGUF is
+                    }  // else keep as GGUF is
                 } else if (model.contains("NITROSD-REAL") ||
                         model.contains("DIFF-INSTRUCTSTAR")) {
                     selectSpinnerString(quant_spinner, "q4_0");
@@ -1168,9 +1175,7 @@ public class SDActivity extends AppCompatActivity {
         boolean needed = vm.prefKeyExist(key) ? vm.getPrefBoolean(key, current) : initValue;
         if (current != needed)
             checkBox.setChecked(needed);
-        // setting the listener after the state change,
-        // to not override user settings during setup;
-        // using post() to avoid race condition
+        // setting listener after selection to not modify other settings
         checkBox.post(() -> checkBox.setOnCheckedChangeListener(listener));
     }
 
@@ -1211,30 +1216,24 @@ public class SDActivity extends AppCompatActivity {
             Toast.makeText(myActivity, "No key for " + getResources().getResourceEntryName(editText.getId()), Toast.LENGTH_LONG).show();
             return;
         }
+        if (editRunnable != null) {
+            try {
+                editText.setOnTouchListener(new EditTouchListener(
+                        SDActivity.this,
+                        editText,
+                        editRunnable.getDeclaredConstructor(SDActivity.class, EditText.class).newInstance(SDActivity.this, editText)
+                ));
+            } catch (Exception ignored) {
+                Toast.makeText(myActivity, "setupEditText(): cannot find constructor of EditRunnable descendant", Toast.LENGTH_LONG).show();
+            }
+        }
         String to = editText.getText().toString();
         String tn = vm.getPrefString(key, to);
         if (!tn.equals(to)) {
             editText.setText(tn);
         }
-        // setting listeners in post() to avoid race condition
-        if (editRunnable != null) {
-            editText.post(() -> {
-                EditTouchListener listener = null;
-                try {
-                    listener = new EditTouchListener(
-                            SDActivity.this,
-                            editText,
-                            editRunnable.getDeclaredConstructor(SDActivity.class, EditText.class).newInstance(SDActivity.this, editText)
-                    );
-                } catch (Exception ignored) {
-                    Toast.makeText(myActivity, "setupEditText(): cannot find constructor of EditRunnable descendant", Toast.LENGTH_LONG).show();
-                }
-                if (listener != null) {
-                    editText.setOnTouchListener(listener);
-                }
-            });
-        }
-        editText.post(() -> editText.setOnFocusChangeListener(editFocusListener));
+        // setting listener after selection to not modify other settings
+        editText.setOnFocusChangeListener(editFocusListener);
     }
 
     final private View.OnFocusChangeListener editFocusListener = (v, hasFocus) -> {
