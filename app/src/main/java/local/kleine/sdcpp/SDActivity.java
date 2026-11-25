@@ -386,7 +386,7 @@ public class SDActivity extends AppCompatActivity {
                 detailsLayout.setLayoutParams(lp);
             });
         }
-        View.OnClickListener detailsTogggler = v -> {
+        View.OnClickListener detailsToggler = v -> {
             ViewGroup.LayoutParams wlp = detailsWrapper.getLayoutParams();
             ViewGroup.LayoutParams lp = detailsLayout.getLayoutParams();
             vm.make_open = wlp.height != ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -400,8 +400,8 @@ public class SDActivity extends AppCompatActivity {
             detailsArrow.setRotation(vm.make_open ? 0 : 270);
             detailsCaption.setText(getString(vm.make_open ? R.string.more_settings_opened : R.string.more_settings_closed));
         };
-        detailsHeader.setOnClickListener(detailsTogggler);
-        detailsFooter.setOnClickListener(detailsTogggler);
+        detailsHeader.setOnClickListener(detailsToggler);
+        detailsFooter.setOnClickListener(detailsToggler);
 
         // checkboxes may switch each other, therefore
         // all references are needed before setup
@@ -1250,9 +1250,9 @@ public class SDActivity extends AppCompatActivity {
     }
 
     private final static class EditTouchListener implements View.OnTouchListener {
-        final GestureDetector clickDectector;
+        final GestureDetector clickDetector;
         EditTouchListener(@NonNull Context ctx, @NonNull EditText v, @NonNull Runnable runnable) {
-            clickDectector = new GestureDetector(ctx, new GestureDetector.SimpleOnGestureListener() {
+            clickDetector = new GestureDetector(ctx, new GestureDetector.SimpleOnGestureListener() {
                 @Override
                 public boolean onSingleTapConfirmed(@NonNull MotionEvent event) {
                     if (v.getLayoutDirection() == View.LAYOUT_DIRECTION_LTR
@@ -1269,7 +1269,7 @@ public class SDActivity extends AppCompatActivity {
         @SuppressLint("ClickableViewAccessibility")
         @Override
         public boolean onTouch(View v, MotionEvent event) {
-            return clickDectector.onTouchEvent(event);
+            return clickDetector.onTouchEvent(event);
         }
     }
 
