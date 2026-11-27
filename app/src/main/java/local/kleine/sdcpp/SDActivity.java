@@ -23,6 +23,7 @@ import android.text.TextWatcher;
 import android.transition.AutoTransition;
 import android.transition.TransitionManager;
 import android.util.DisplayMetrics;
+import android.view.Choreographer;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -1117,11 +1118,14 @@ public class SDActivity extends AppCompatActivity {
         Object item = spinner.getSelectedItem();
         String to = item == null ? "" : item.toString();
         String tn = vm.getPrefString(key, to);
-        if (!tn.equals(to))
-            selectSpinnerString(spinner, tn);
-        // setting listener after selection to not modify other settings
-        spinner.post(() -> spinner.setOnItemSelectedListener(spinnerListener));
-        // setting value in spinner selection cache manually
+        if (!tn.equals(to)) {
+            spinner.post(() ->  // calling strictly in same queue before postFrameCallback
+                    selectSpinnerString(spinner, tn));
+        }
+        // Setting a listener after selection was completed to not modify other settings.
+        // The spinner listener will be called after repaint, therefore delaying for 1 screen frame
+        spinner.post(() -> Choreographer.getInstance().postFrameCallback(frameTimeNanos -> spinner.post(() -> spinner.setOnItemSelectedListener(spinnerListener))));
+        // initializing the selected value in spinner selection cache manually
         spinSel[spinSelIndex] = tn;
     }
 
@@ -1196,10 +1200,13 @@ public class SDActivity extends AppCompatActivity {
         }
         boolean current = checkBox.isChecked();
         boolean needed = vm.prefKeyExist(key) ? vm.getPrefBoolean(key, current) : initValue;
-        if (current != needed)
-            checkBox.setChecked(needed);
-        // setting listener after selection to not modify other settings
-        checkBox.post(() -> checkBox.setOnCheckedChangeListener(listener));
+        if (current != needed) {
+            checkBox.post(() ->  // calling strictly in same queue before postFrameCallback
+                    checkBox.setChecked(needed));
+        }
+        // Setting a listener after a switching to not modify other settings.
+        // Delaying for 1 screen frame to make sure that the switching was completed
+        checkBox.post(() -> Choreographer.getInstance().postFrameCallback(frameTimeNanos -> checkBox.post(() -> checkBox.setOnCheckedChangeListener(listener))));
     }
 
     final private static Map<Integer, String> editsMap = new HashMap<>();
