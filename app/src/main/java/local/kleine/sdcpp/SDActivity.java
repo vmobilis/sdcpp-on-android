@@ -1,5 +1,7 @@
 package local.kleine.sdcpp;
 
+import static java.lang.Math.max;
+
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -87,7 +89,8 @@ public class SDActivity extends AppCompatActivity {
     };
 
     private String taesdModel, taesdXLModel;
-    private String sdProgramPath, helperPath, libPath, sdFileName; // Note: "sd" or "sd_cli" executable needs renaming because it is now located inside jniLibs
+    private String helperPath = "";
+    private String sdProgramPath, libPath, sdFileName; // Note: "sd" or "sd_cli" executable needs renaming because it is now located inside jniLibs
     private final static String libVendorPath = "/vendor/lib64";  // no support possible for 32 bit with openCL
     private final static String ChklibopenCL = "libchkopenCL.so";
     private final static String SDlibopenCL = "libsdopenCL.so";
@@ -306,10 +309,9 @@ public class SDActivity extends AppCompatActivity {
             }
             return;
         }
-
         nativeLibDir = new File(getApplicationInfo().nativeLibraryDir);
 
-        // EditTexts
+        // edittexts
         promptEditor = findViewById(R.id.stringprompt);
         setupEditText(promptEditor, EditResetter.class);
         promptEditor.addTextChangedListener(createTextWatcher());
@@ -401,16 +403,8 @@ public class SDActivity extends AppCompatActivity {
         // checkboxes
         taesdchecker = findViewById(R.id.taesdchecker);
         setupCheckBox(taesdchecker, true, taesdCheckListener);  // suggest by default
-        if (!taesdModel.isEmpty()) {  // filled by listFilesRecursively()
-            TextView taesdview = findViewById(R.id.taesdmodel);
-            taesdview.setText(taesdModel.substring(taesdModel.lastIndexOf('/') + 1) + "  (in lora path)");
-        }
         taesdXLchecker = findViewById(R.id.taesdXLchecker);
         setupCheckBox(taesdXLchecker, true, taesdCheckListener);  // suggest by default
-        if (!taesdXLModel.isEmpty()) {  // filled by listFilesRecursively()
-            TextView taesdXLview = findViewById(R.id.taesdXLmodel);
-            taesdXLview.setText(taesdXLModel.substring(taesdXLModel.lastIndexOf('/') + 1) + "  (in lora path)");
-        }
         embeddchecker = findViewById(R.id.embeddchecker);
         setupCheckBox(embeddchecker, false, onCheckedChangeListener);  // disable embeddings by default
         gpuchecker = findViewById(R.id.usegpu);
@@ -424,14 +418,22 @@ public class SDActivity extends AppCompatActivity {
         CheckBox writeLogChecker = findViewById(R.id.writelogchecker);
         setupCheckBox(writeLogChecker, true, onCheckedChangeListener);  // save log by default
 
+        // textviews
         TextView loraPathView = findViewById(R.id.lorapath);
-        // filled by listFilesRecursively()
-        loraPathView.setText(helperPath);
+        loraPathView.setText(helperPath);  // filled by listFilesRecursively()
+        if (!taesdModel.isEmpty()) {  // filled by listFilesRecursively()
+            TextView taesdview = findViewById(R.id.taesdmodel);
+            taesdview.setText(taesdModel.substring(taesdModel.lastIndexOf('/') + 1) + "  (in lora path)");
+        }
+        if (!taesdXLModel.isEmpty()) {  // filled by listFilesRecursively()
+            TextView taesdXLview = findViewById(R.id.taesdXLmodel);
+            taesdXLview.setText(taesdXLModel.substring(taesdXLModel.lastIndexOf('/') + 1) + "  (in lora path)");
+        }
 
         // buttons
         Button fileSelectButton = findViewById(R.id.fileSelectButton);
         fileSelectButton.setOnClickListener(new SDUIoptionsLoader());
-        final Button submitButton = findViewById(R.id.submitButton);  // will be used in post(), therefore final
+        Button submitButton = findViewById(R.id.submitButton);
         submitButton.setOnClickListener(v -> {
             wrapperView.setVisibility(View.GONE);
             vm.savePreferences();
@@ -551,7 +553,7 @@ public class SDActivity extends AppCompatActivity {
                     if ("-b".equals(args[i]) || "--batch-count".equals(args[i])) {
                         try {
                             i++; // get next arg (batch count)
-                            batchsize = Math.max(Integer.parseInt(args[i]), 1);
+                            batchsize = max(Integer.parseInt(args[i]), 1);
                         } catch (NumberFormatException ex) {
                             batchsize = 1;
                         }
@@ -625,8 +627,7 @@ public class SDActivity extends AppCompatActivity {
             return true;
         });
 
-//        return;  // for testing
-//*
+//      /* uncomment this line for testing
         // overriding user choices when it's impossible to use old settings
         if (fileList.isEmpty()) {
             submitButton.setEnabled(false);
@@ -664,7 +665,6 @@ public class SDActivity extends AppCompatActivity {
             gpuchecker.setEnabled(false);
         }
         //*/
-
     }
 
     @NonNull
@@ -865,7 +865,8 @@ public class SDActivity extends AppCompatActivity {
 // and needed only if ConcurrentModificationException
 // or IndexOutOfBoundsException exceptions occur.
 // They should not happen because stdout read cycle
-// waits for readline() and has enough time to copy values to logList
+// waits for readline() and logList has enough time to copy values
+// before outputArrayList chhanges
 //            synchronized (sd_thread.outputArrayList) {
             int countA = logList.size();
             int countL = sd_thread.outputArrayList.size();
@@ -1103,7 +1104,7 @@ public class SDActivity extends AppCompatActivity {
         // selects position 0 when string is absent
         // cast to ArrayAdapter<String> is safe for SpinnerAdapter with strings
         //noinspection unchecked
-        spinner.setSelection(Math.max(0, ((ArrayAdapter<String>) spinner.getAdapter()).getPosition(val)));
+        spinner.setSelection(max(0, ((ArrayAdapter<String>) spinner.getAdapter()).getPosition(val)));
     }
 
     private void setupSpinner(@NonNull Spinner spinner, int spinSelIndex) {
@@ -1169,14 +1170,14 @@ public class SDActivity extends AppCompatActivity {
                 selectSpinnerString(quant_spinner, "default");
                 //selectSpinnerString(quant_spinner,
                 //        model.contains("SDXS") ? "f16" : "q4_0");
-            } else {  // cpu
+            } else {  // cpu,
                 // for some budget devices with low RAM and NO usable openCL drivers:
                 if (model.contains("SSD")) {
                     selectSpinnerString(quant_spinner, "q8_0");
                 } else if (model.contains("XL")) {
                     if (!model.contains("GGUF")) {
                         selectSpinnerString(quant_spinner, "q8_0");
-                    }  // else keep as GGUF is
+                    } // else keep as GGUF is
                 } else if (model.contains("NITROSD-REAL") ||
                         model.contains("DIFF-INSTRUCTSTAR")) {
                     selectSpinnerString(quant_spinner, "q4_0");
@@ -1254,7 +1255,6 @@ public class SDActivity extends AppCompatActivity {
         if (!tn.equals(to)) {
             editText.setText(tn);
         }
-        // setting listener after selection to not modify other settings
         editText.setOnFocusChangeListener(editFocusListener);
     }
 
