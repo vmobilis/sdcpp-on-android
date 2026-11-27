@@ -32,6 +32,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!--
+https://github.com/akleine/sdcpp-on-android/commit/913f72e0ed0ae74aefd9b05d2d07b8db98dd40e5
+https://stackoverflow.com/questions/24262414/android-keyboard-hides-edittext
+            vvv android:windowSoftInputMode="adjustResize" -->
         <activity
             android:name=".SDActivity"
             android:theme="@style/MyApplication">
