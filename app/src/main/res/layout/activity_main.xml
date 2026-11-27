@@ -4,8 +4,13 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
-    android:layout_marginHorizontal="5dp"
     android:orientation="horizontal">
+<!--
+    ^^^
+https://github.com/akleine/sdcpp-on-android/commit/913f72e0ed0ae74aefd9b05d2d07b8db98dd40e5
+https://stackoverflow.com/questions/24262414/android-keyboard-hides-edittext
+    android:fitsSystemWindows="true"
+-->
 <!-- for RTL test set android:supportsRtl="true" in AndroidManifest.xml
     android:layoutDirection="rtl"
     android:layout_marginHorizontal="50dp"
@@ -578,6 +583,22 @@
                                 android:drawablePadding="10dp"
                                 android:drawableEnd="@drawable/folder_open"
                                 tools:ignore="Autofill,TouchTargetSizeCheck" />
+
+<!-- EditText with 2 buttons
+                            <EditText
+                                android:id="@+id/stringvae"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="text"
+                                android:labelFor="@id/stringvaemsg"
+                                android:singleLine="true"
+                                android:text=""
+                                android:textAlignment="viewEnd"
+                                android:drawablePadding="10dp"
+                                android:drawableRight="@drawable/close_circle"
+                                android:drawableLeft="@drawable/folder_open"
+                                tools:ignore="Autofill,TouchTargetSizeCheck" />
+-->
 
                             <TextView
                                 android:id="@+id/stringoptmsg"
