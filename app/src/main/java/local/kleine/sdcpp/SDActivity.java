@@ -23,6 +23,7 @@ import android.text.TextWatcher;
 import android.transition.AutoTransition;
 import android.transition.TransitionManager;
 import android.util.DisplayMetrics;
+import android.view.Choreographer;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -345,15 +346,15 @@ public class SDActivity extends AppCompatActivity {
         ArrayAdapter<String> model_adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, fileList);
         model_adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         model_spinner.setAdapter(model_adapter);
-        setupSpinner(model_spinner);
+        setupSpinner(model_spinner, SPINSEL_MODEL);
         sampler_spinner = findViewById(R.id.sampler_spinner);
-        setupSpinner(sampler_spinner);
+        setupSpinner(sampler_spinner, SPINSEL_SAMPLER);
         scheduler_spinner = findViewById(R.id.scheduler_spinner);
-        setupSpinner(scheduler_spinner);
+        setupSpinner(scheduler_spinner, SPINSEL_SCHEDULER);
         ext_spinner = findViewById(R.id.ext_spinner);
-        setupSpinner(ext_spinner);
+        setupSpinner(ext_spinner, SPINSEL_EXTENSION);
         quant_spinner = findViewById(R.id.quant_spinner);
-        setupSpinner(quant_spinner);
+        setupSpinner(quant_spinner, SPINSEL_QUANTIZER);
 
         // animator setup
         LinearLayout animatedLayout = findViewById(R.id.details_animation);
@@ -400,20 +401,20 @@ public class SDActivity extends AppCompatActivity {
 
         // checkboxes
         taesdchecker = findViewById(R.id.taesdchecker);
-        taesdXLchecker = findViewById(R.id.taesdXLchecker);
-        embeddchecker = findViewById(R.id.embeddchecker);
-        gpuchecker = findViewById(R.id.usegpu);
-        vaetilingchecker = findViewById(R.id.vaetiling);
-        convdirectchecker = findViewById(R.id.convdirect);
-        writeCmdlineChecker = findViewById(R.id.writecmdchecker);
-        CheckBox writeLogChecker = findViewById(R.id.writelogchecker);
         setupCheckBox(taesdchecker, true, taesdCheckListener);  // suggest by default
+        taesdXLchecker = findViewById(R.id.taesdXLchecker);
         setupCheckBox(taesdXLchecker, true, taesdCheckListener);  // suggest by default
+        embeddchecker = findViewById(R.id.embeddchecker);
         setupCheckBox(embeddchecker, false, onCheckedChangeListener);  // disable embeddings by default
+        gpuchecker = findViewById(R.id.usegpu);
         setupCheckBox(gpuchecker, true, new GpuCheckListener());  // enable GPU by default
+        vaetilingchecker = findViewById(R.id.vaetiling);
         setupCheckBox(vaetilingchecker, true, onCheckedChangeListener);  // enable by default to reduce memory
+        convdirectchecker = findViewById(R.id.convdirect);
         setupCheckBox(convdirectchecker, true, onCheckedChangeListener);
+        writeCmdlineChecker = findViewById(R.id.writecmdchecker);
         setupCheckBox(writeCmdlineChecker, true, onCheckedChangeListener);  // write command script by default
+        CheckBox writeLogChecker = findViewById(R.id.writelogchecker);
         setupCheckBox(writeLogChecker, true, onCheckedChangeListener);  // save log by default
 
         // textviews
@@ -1094,7 +1095,7 @@ public class SDActivity extends AppCompatActivity {
         spinner.setSelection(max(0, ((ArrayAdapter<String>) spinner.getAdapter()).getPosition(val)));
     }
 
-    private void setupSpinner(@NonNull Spinner spinner) {
+    private void setupSpinner(@NonNull Spinner spinner, int spinSelIndex) {
         String key = spinnersMap.get(spinner.getId());
         if (key == null) {
             // id-key pair must be defined in spinnersMap
@@ -1104,9 +1105,15 @@ public class SDActivity extends AppCompatActivity {
         Object item = spinner.getSelectedItem();
         String to = item == null ? "" : item.toString();
         String tn = vm.getPrefString(key, to);
-        if (!tn.equals(to))
-            selectSpinnerString(spinner, tn);
-        spinner.setOnItemSelectedListener(spinnerListener);
+        if (!tn.equals(to)) {
+            spinner.post(() ->  // calling strictly in same queue before postFrameCallback
+                    selectSpinnerString(spinner, tn));
+        }
+        // Setting a listener after selection was completed to not modify other settings.
+        // The spinner listener will be called after repaint, therefore delaying for 1 screen frame
+        spinner.post(() -> Choreographer.getInstance().postFrameCallback(frameTimeNanos -> spinner.post(() -> spinner.setOnItemSelectedListener(spinnerListener))));
+        // initializing the selected value in spinner selection cache manually
+        spinSel[spinSelIndex] = tn;
     }
 
     final private static Map<Integer, String> checkboxesMap = new HashMap<>();
@@ -1180,11 +1187,13 @@ public class SDActivity extends AppCompatActivity {
         }
         boolean current = checkBox.isChecked();
         boolean needed = vm.prefKeyExist(key) ? vm.getPrefBoolean(key, current) : initValue;
-        if (current != needed)
-            checkBox.setChecked(needed);
-        // setting the listener after the state change,
-        // to not override user settings during setup
-        checkBox.setOnCheckedChangeListener(listener);
+        if (current != needed) {
+            checkBox.post(() ->  // calling strictly in same queue before postFrameCallback
+                    checkBox.setChecked(needed));
+        }
+        // Setting a listener after a switching to not modify other settings.
+        // Delaying for 1 screen frame to make sure that the switching was completed
+        checkBox.post(() -> Choreographer.getInstance().postFrameCallback(frameTimeNanos -> checkBox.post(() -> checkBox.setOnCheckedChangeListener(listener))));
     }
 
     final private static Map<Integer, String> editsMap = new HashMap<>();
